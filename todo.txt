@@ -1,0 +1,13 @@
+**Service Interface**
+● Signing up
+● Authentication
+● Account Holders
+● Accounts
+● Transactions
+● Money Transfer
+● Cards
+● Statements
+
+
+TODO
+1. 
