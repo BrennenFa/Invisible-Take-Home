@@ -4,6 +4,7 @@ from jose import jwt, JWTError
 from sqlalchemy.orm import Session
 import os
 from dotenv import load_dotenv
+from uuid import UUID
 
 
 from .database import get_db
@@ -30,7 +31,7 @@ def get_current_user(
     except JWTError:
         raise HTTPException(status_code=401, detail="Invalid token")
 
-    user = db.query(User).get(int(user_id))
+    user = db.query(User).get(UUID(user_id))
     if not user:
         raise HTTPException(status_code=401, detail="User not found")
 

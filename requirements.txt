@@ -6,3 +6,7 @@ passlib[bcrypt]
 python-jose[cryptography]
 pydantic
 pydantic[email]
+uvicorn
+pytest
+pytest-asyncio
+bcrypt==4.0.1

@@ -1,8 +1,10 @@
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Numeric, Enum
+from sqlalchemy import Column, String, DateTime, ForeignKey, Numeric, Enum
 from sqlalchemy.orm import relationship
 from datetime import datetime
 from .database import Base
 import enum
+import uuid
+from sqlalchemy.dialects.postgresql import UUID
 
 """
 Database models for the banking application.
@@ -26,9 +28,16 @@ class AccountStatus(enum.Enum):
     CLOSED = "CLOSED"
 
 
-class TransactionType(enum.Enum):
+class TransactionDirection(enum.Enum):
     DEBIT = "DEBIT"
     CREDIT = "CREDIT"
+
+
+class TransactionCategory(enum.Enum):
+    TRANSFER = "TRANSFER"
+    CARD_PAYMENT = "CARD_PAYMENT"
+    DEPOSIT = "DEPOSIT"
+    WITHDRAWAL = "WITHDRAWAL"
 
 
 class RoleType(enum.Enum):
@@ -42,7 +51,7 @@ class RoleType(enum.Enum):
 class User(Base):
     __tablename__ = "users"
 
-    id = Column(Integer, primary_key=True, index=True)
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
     email = Column(String, unique=True, index=True, nullable=False)
     hashed_password = Column(String, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
@@ -55,11 +64,10 @@ class User(Base):
 class Account(Base):
     __tablename__ = "accounts"
 
-    id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
     type = Column(Enum(AccountType), nullable=False)
     balance = Column(Numeric(precision=10, scale=2), default=0.0, nullable=False)
-    currency = Column(String(3), default="USD", nullable=False)
     status = Column(Enum(AccountStatus), default=AccountStatus.ACTIVE, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
 
@@ -70,25 +78,31 @@ class Account(Base):
 class Transaction(Base):
     __tablename__ = "transactions"
 
-    id = Column(Integer, primary_key=True, index=True)
-    account_id = Column(Integer, ForeignKey("accounts.id"), nullable=False)
-    type = Column(Enum(TransactionType), nullable=False)
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    account_id = Column(UUID(as_uuid=True), ForeignKey("accounts.id"), nullable=False)
+    type = Column(Enum(TransactionDirection), nullable=False)
     amount = Column(Numeric(precision=10, scale=2), nullable=False)
     description = Column(String, nullable=True)
     reference = Column(String, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
 
+    # transfer category and link
+    category = Column(Enum(TransactionCategory), nullable=False, default=TransactionCategory.TRANSFER)
+    card_id = Column(UUID(as_uuid=True), nullable=True)
+    transfer_id = Column(UUID(as_uuid=True), ForeignKey("transfers.id"), nullable=True)
+
     account = relationship("Account", back_populates="transactions")
+    transfer = relationship("Transfer", foreign_keys=[transfer_id])
 
 
 class Transfer(Base):
     __tablename__ = "transfers"
 
-    id = Column(String, primary_key=True)
-    source_account_id = Column(Integer, ForeignKey("accounts.id"), nullable=False)
-    destination_account_id = Column(Integer, ForeignKey("accounts.id"), nullable=False)
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    source_account_id = Column(UUID(as_uuid=True), ForeignKey("accounts.id"), nullable=False)
+    destination_account_id = Column(UUID(as_uuid=True), ForeignKey("accounts.id"), nullable=False)
     amount = Column(Numeric(precision=10, scale=2), nullable=False)
     description = Column(String, nullable=True)
-    source_transaction_id = Column(Integer, ForeignKey("transactions.id"), nullable=False)
-    destination_transaction_id = Column(Integer, ForeignKey("transactions.id"), nullable=False)
+    source_transaction_id = Column(UUID(as_uuid=True), ForeignKey("transactions.id"), nullable=False)
+    destination_transaction_id = Column(UUID(as_uuid=True), ForeignKey("transactions.id"), nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)

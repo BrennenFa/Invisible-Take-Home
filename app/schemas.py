@@ -1,6 +1,7 @@
 from pydantic import BaseModel, EmailStr
 from datetime import datetime
 from typing import Optional
+from uuid import UUID
 
 """
 Pydantic models for the banking application.
@@ -12,7 +13,7 @@ class UserCreate(BaseModel):
 
 
 class UserOut(BaseModel):
-    id: int
+    id: UUID
     email: EmailStr
 
     class Config:
@@ -26,15 +27,13 @@ class Token(BaseModel):
 
 class AccountCreate(BaseModel):
     type: str
-    currency: Optional[str] = "USD"
 
 
 class AccountOut(BaseModel):
-    id: int
-    user_id: int
+    id: UUID
+    user_id: UUID
     type: str
     balance: float
-    currency: str
     status: str
     created_at: datetime
 
@@ -43,31 +42,46 @@ class AccountOut(BaseModel):
 
 
 class TransactionOut(BaseModel):
-    id: int
-    account_id: int
+    id: UUID
+    account_id: UUID
     type: str
     amount: float
     description: Optional[str]
     reference: Optional[str]
     created_at: datetime
+    category: str
+    transfer_id: Optional[UUID]
+    card_id: Optional[UUID]
 
     class Config:
         orm_mode = True
 
 
 class TransferCreate(BaseModel):
-    source_account_id: int
-    destination_account_id: int
+    source_account_id: UUID
+    destination_account_id: UUID
     amount: float
     description: Optional[str] = None
 
 
 class TransferOut(BaseModel):
-    id: str
-    source_account_id: int
-    destination_account_id: int
+    id: UUID
+    source_account_id: UUID
+    destination_account_id: UUID
     amount: float
     description: Optional[str]
     created_at: datetime
-    source_transaction_id: int
-    destination_transaction_id: int
+    source_transaction_id: UUID
+    destination_transaction_id: UUID
+
+
+class DepositCreate(BaseModel):
+    account_id: UUID
+    amount: float
+    description: Optional[str] = None
+
+
+class WithdrawalCreate(BaseModel):
+    account_id: UUID
+    amount: float
+    description: Optional[str] = None

@@ -4,3 +4,4 @@ curl/
 app/__pycache__/
 db/*
 __pycache__
+.claude/

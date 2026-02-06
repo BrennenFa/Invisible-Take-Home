@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 from passlib.context import CryptContext
 from jose import jwt
 from datetime import datetime, timedelta
+from uuid import UUID
 from ..security import get_current_user
 
 from ..database import get_db
@@ -37,7 +38,7 @@ def verify_password(password: str, hashed: str) -> bool:
     return pwd_context.verify(password, hashed)
 
 
-def create_access_token(user_id: int):
+def create_access_token(user_id: UUID):
     payload = {
         "sub": str(user_id),
         "exp": datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)

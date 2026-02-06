@@ -3,6 +3,7 @@ from .database import Base, engine
 from .routes.auth import router as auth_router
 from .routes.accounts import router as accounts_router
 from .routes.transfers import router as transfers_router
+from .routes.transactions import router as transactions_router
 
 
 # create database tables ---- remove!!!!!
@@ -14,6 +15,7 @@ app = FastAPI(title="Banking REST API")
 app.include_router(auth_router)
 app.include_router(accounts_router)
 app.include_router(transfers_router)
+app.include_router(transactions_router)
 
 
 @app.get("/")

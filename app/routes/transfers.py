@@ -1,3 +1,4 @@
+from typing import List
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
@@ -5,7 +6,7 @@ from decimal import Decimal
 import uuid
 
 from ..database import get_db
-from ..models import Account, User, Transaction, TransactionType, AccountStatus, Transfer
+from ..models import Account, User, Transaction, TransactionDirection, AccountStatus, Transfer, TransactionCategory
 from ..schemas import TransferCreate, TransferOut
 from ..security import get_current_user
 
@@ -19,6 +20,9 @@ def create_transfer(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
+    """
+    Create a transfer between two accounts.
+    """
     # validate that amount is positive
     if transfer.amount <= 0:
         raise HTTPException(status_code=400, detail="Amount must be positive")
@@ -70,13 +74,6 @@ def create_transfer(
             )
 
 
-        # TODO -- currency swap
-        # Check currency match
-        if source_account.currency != destination_account.currency:
-            raise HTTPException(
-                status_code=400,
-                detail="Currency mismatch between accounts"
-            )
 
         # Check sufficient balance
         amount_decimal = Decimal(str(transfer.amount))
@@ -93,10 +90,12 @@ def create_transfer(
         # Create DEBIT transaction for source account
         debit_transaction = Transaction(
             account_id=source_account.id,
-            type=TransactionType.DEBIT,
+            type=TransactionDirection.DEBIT,
             amount=amount_decimal,
             description=transfer.description or f"Transfer to account {destination_account.id}",
-            reference=transfer_ref
+            reference=transfer_ref,
+            category=TransactionCategory.TRANSFER,
+            transfer_id=transfer_id
         )
 
         # add debit transaction to session
@@ -106,10 +105,12 @@ def create_transfer(
         # Create CREDIT transaction for destination account
         credit_transaction = Transaction(
             account_id=destination_account.id,
-            type=TransactionType.CREDIT,
+            type=TransactionDirection.CREDIT,
             amount=amount_decimal,
             description=transfer.description or f"Transfer from account {source_account.id}",
-            reference=transfer_ref
+            reference=transfer_ref,
+            category=TransactionCategory.TRANSFER,
+            transfer_id=transfer_id
         )
         # add credit transaction to session
         db.add(credit_transaction)
@@ -155,3 +156,51 @@ def create_transfer(
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Transfer failed: {str(e)}")
+    
+
+    
+@router.get("", response_model=List[TransferOut])
+def get_transfers(
+    skip: int = 0,
+    limit: int = 100,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Retrieve all transfers involving the current user.
+    """
+    # We join with the Account model to filter by the user_id of the owners
+    transfers = db.query(Transfer).join(
+        Account, 
+        (Transfer.source_account_id == Account.id) | (Transfer.destination_account_id == Account.id)
+    ).filter(
+        Account.user_id == current_user.id
+    ).distinct().offset(skip).limit(limit).all()
+
+    return transfers
+
+@router.get("/{transfer_id}", response_model=TransferOut)
+def get_transfer_by_id(
+    transfer_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Get details for a specific transfer.
+    """
+    transfer = db.query(Transfer).filter(Transfer.id == transfer_id).first()
+    
+    if not transfer:
+        raise HTTPException(status_code=404, detail="Transfer not found")
+
+    # Security check: Ensure the user owns one of the accounts involved
+    source_acc = db.query(Account).filter(Account.id == transfer.source_account_id).first()
+    dest_acc = db.query(Account).filter(Account.id == transfer.destination_account_id).first()
+
+    if source_acc.user_id != current_user.id and dest_acc.user_id != current_user.id:
+        raise HTTPException(
+            status_code=403, 
+            detail="You do not have permission to view this transfer"
+        )
+
+    return transfer
