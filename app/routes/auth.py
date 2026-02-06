@@ -5,11 +5,11 @@ from sqlalchemy.orm import Session
 from passlib.context import CryptContext
 from jose import jwt
 from datetime import datetime, timedelta
-from .security import get_current_user
+from ..security import get_current_user
 
-from .database import get_db
-from .models import User
-from .schemas import UserCreate, Token, UserOut
+from ..database import get_db
+from ..models import User
+from ..schemas import UserCreate, Token, UserOut
 
 
 load_dotenv()
@@ -19,10 +19,16 @@ JWT_ALGORITHM = os.getenv("JWT_ALGORITHM")
 ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES"))
 
 
+# auth routes
 router = APIRouter(prefix="/auth", tags=["auth"])
+
+# handle password hashing
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 
+# =================================================================
+# Auth helper methods
+# =================================================================
 def hash_password(password: str) -> str:
     return pwd_context.hash(password)
 
@@ -39,6 +45,9 @@ def create_access_token(user_id: int):
     return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
 
 
+# =================================================================
+# Auth routes
+# =================================================================
 @router.post("/signup", response_model=Token)
 def signup(user: UserCreate, db: Session = Depends(get_db)):
 
@@ -65,10 +74,9 @@ def signup(user: UserCreate, db: Session = Depends(get_db)):
 @router.post("/login", response_model=Token)
 def login(user: UserCreate, db: Session = Depends(get_db)):
 
-
     db_user = db.query(User).filter(User.email == user.email).first()
 
-
+    # validate user password
     if not db_user or not verify_password(user.password, db_user.hashed_password):
         raise HTTPException(status_code=401, detail="Invalid credentials")
 

@@ -1,13 +1,16 @@
 **Service Interface**
-● Signing up
-● Authentication
-● Account Holders
-● Accounts
-● Transactions
+● Signing up  - somewhat
+● Authentication - somewhat
+● Account Holders --- unclear
+● Accounts - somewhat
+● Transactions - somewhat
 ● Money Transfer
 ● Cards
 ● Statements
 
 
 TODO
-1. 
+1. account status
+2. JWT config safety --- jwt secret missing, algo validation
+3. /transfer idempotency
+4. (sqlite - no db verification)
