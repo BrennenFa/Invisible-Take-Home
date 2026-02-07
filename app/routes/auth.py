@@ -7,7 +7,7 @@ from jose import jwt
 from datetime import datetime, timedelta
 from uuid import UUID
 from ..security import get_current_user
-from ..rate_limit import limiter
+from ..security import limiter
 
 from ..database import get_db
 from ..models import User

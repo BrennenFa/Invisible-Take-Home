@@ -102,7 +102,7 @@ class Transaction(Base):
     # transfer category and link
     category = Column(Enum(TransactionCategory), nullable=False, default=TransactionCategory.TRANSFER)
     card_id = Column(UUID(as_uuid=True), ForeignKey("cards.id"), nullable=True)
-    transfer_id = Column(UUID(as_uuid=True), ForeignKey("transfers.id"), nullable=True)
+    transfer_id = Column(UUID(as_uuid=True), ForeignKey("transfers.id"), nullable=True, use_alter=True)
 
     account = relationship("Account", back_populates="transactions")
     transfer = relationship("Transfer", foreign_keys=[transfer_id])

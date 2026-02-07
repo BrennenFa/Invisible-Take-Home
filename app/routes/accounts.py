@@ -7,7 +7,7 @@ from ..database import get_db
 from ..models import Account, User, AccountType, AccountStatus, Transaction
 from ..schemas import AccountCreate, AccountOut, TransactionOut
 from ..security import get_current_user
-from ..rate_limit import limiter
+from ..security import limiter
 
 # accounts routes
 router = APIRouter(prefix="/accounts", tags=["accounts"], dependencies=[Depends(limiter.limit("100/minute"))])

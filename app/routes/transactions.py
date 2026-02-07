@@ -9,7 +9,7 @@ from ..database import get_db
 from ..models import Account, User, Transaction, TransactionDirection, AccountStatus, TransactionCategory, Card, CardStatus
 from ..schemas import DepositCreate, WithdrawalCreate, TransactionOut, CardPaymentCreate
 from ..security import get_current_user
-from ..rate_limit import limiter
+from ..security import limiter
 from datetime import datetime
 
 

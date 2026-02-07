@@ -10,7 +10,7 @@ from ..database import get_db
 from ..models import Account, User, Transaction, TransactionDirection, AccountStatus, Transfer, TransactionCategory
 from ..schemas import TransferCreate, TransferOut
 from ..security import get_current_user
-from ..rate_limit import limiter
+from ..security import limiter
 
 
 router = APIRouter(prefix="/transfers", tags=["transfers"], dependencies=[Depends(limiter.limit("50/minute"))])

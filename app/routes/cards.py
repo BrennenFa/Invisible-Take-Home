@@ -10,7 +10,7 @@ from ..database import get_db
 from ..models import Card, Account, User, CardType, CardStatus, AccountStatus
 from ..schemas import CardCreate, CardOut
 from ..security import get_current_user
-from ..rate_limit import limiter
+from ..security import limiter
 
 
 router = APIRouter(prefix="/cards", tags=["cards"], dependencies=[Depends(limiter.limit("100/minute"))])
@@ -91,7 +91,7 @@ def create_card(
     pin_hash = pwd_context.hash(card.pin)
 
     # Set expiry date to 3 years from now
-    expiry_date = datetime.utcnow() + timedelta(days=365 * 3)
+    expiry_date = datetime.now(datetime.UTC) + timedelta(days=365 * 3)
 
     # Create card
     db_card = Card(
