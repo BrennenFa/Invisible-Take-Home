@@ -45,6 +45,17 @@ class RoleType(enum.Enum):
     ADMIN = "ADMIN"
 
 
+class CardType(enum.Enum):
+    DEBIT = "DEBIT"
+    CREDIT = "CREDIT"
+
+
+class CardStatus(enum.Enum):
+    ACTIVE = "ACTIVE"
+    FROZEN = "FROZEN"
+    CANCELLED = "CANCELLED"
+
+
 # =================================================================
 # Models
 # =================================================================
@@ -69,10 +80,12 @@ class Account(Base):
     type = Column(Enum(AccountType), nullable=False)
     balance = Column(Numeric(precision=10, scale=2), default=0.0, nullable=False)
     status = Column(Enum(AccountStatus), default=AccountStatus.ACTIVE, nullable=False)
+    overdraft_limit = Column(Numeric(precision=10, scale=2), default=0.0, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
 
     owner = relationship("User", back_populates="accounts")
     transactions = relationship("Transaction", back_populates="account", cascade="all, delete-orphan")
+    cards = relationship("Card", back_populates="account", cascade="all, delete-orphan")
 
 
 class Transaction(Base):
@@ -88,11 +101,12 @@ class Transaction(Base):
 
     # transfer category and link
     category = Column(Enum(TransactionCategory), nullable=False, default=TransactionCategory.TRANSFER)
-    card_id = Column(UUID(as_uuid=True), nullable=True)
+    card_id = Column(UUID(as_uuid=True), ForeignKey("cards.id"), nullable=True)
     transfer_id = Column(UUID(as_uuid=True), ForeignKey("transfers.id"), nullable=True)
 
     account = relationship("Account", back_populates="transactions")
     transfer = relationship("Transfer", foreign_keys=[transfer_id])
+    card = relationship("Card", foreign_keys=[card_id])
 
 
 class Transfer(Base):
@@ -106,3 +120,22 @@ class Transfer(Base):
     source_transaction_id = Column(UUID(as_uuid=True), ForeignKey("transactions.id"), nullable=False)
     destination_transaction_id = Column(UUID(as_uuid=True), ForeignKey("transactions.id"), nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+
+class Card(Base):
+    __tablename__ = "cards"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    account_id = Column(UUID(as_uuid=True), ForeignKey("accounts.id"), nullable=False)
+    card_number = Column(String, unique=True, nullable=False)
+    card_holder_name = Column(String, nullable=False)
+    cvv = Column(String, nullable=False)
+    pin_hash = Column(String, nullable=False)
+    card_type = Column(Enum(CardType), nullable=False)
+    expiry_date = Column(DateTime, nullable=False)
+    status = Column(Enum(CardStatus), default=CardStatus.ACTIVE, nullable=False)
+    spending_limit = Column(Numeric(precision=10, scale=2), nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    account = relationship("Account", back_populates="cards")
+    transactions = relationship("Transaction", back_populates="card", foreign_keys="Transaction.card_id")

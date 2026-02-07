@@ -1,7 +1,36 @@
+# Environment variables
 .env
-venv
-curl/
+
+# Virtual environment
+venv/
+env/
+
+# SQLite database
+*.db
+*.sqlite
+*.sqlite3
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
 app/__pycache__/
-db/*
-__pycache__
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
 .claude/
+
+# Project specific
+curl/
+db/*
+AI_USAGE.md

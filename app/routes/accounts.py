@@ -7,9 +7,10 @@ from ..database import get_db
 from ..models import Account, User, AccountType, AccountStatus, Transaction
 from ..schemas import AccountCreate, AccountOut, TransactionOut
 from ..security import get_current_user
+from ..rate_limit import limiter
 
 # accounts routes
-router = APIRouter(prefix="/accounts", tags=["accounts"])
+router = APIRouter(prefix="/accounts", tags=["accounts"], dependencies=[Depends(limiter.limit("100/minute"))])
 
 # Create account
 @router.post("", response_model=AccountOut, status_code=201)
@@ -100,3 +101,108 @@ def get_account_transactions(
     ).order_by(Transaction.created_at.desc()).all()
 
     return transactions
+
+
+# Freeze account
+@router.patch("/{id}/freeze", response_model=AccountOut)
+def freeze_account(
+    id: UUID,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Freeze an account to prevent transactions."""
+
+    account = db.query(Account).filter(
+        Account.id == id,
+        Account.user_id == current_user.id
+    ).first()
+
+    if not account:
+        raise HTTPException(status_code=404, detail="Account not found")
+
+    if account.status == AccountStatus.CLOSED:
+        raise HTTPException(
+            status_code=400,
+            detail="Cannot freeze a closed account"
+        )
+
+    if account.status == AccountStatus.FROZEN:
+        raise HTTPException(
+            status_code=400,
+            detail="Account is already frozen"
+        )
+
+    account.status = AccountStatus.FROZEN
+    db.commit()
+    db.refresh(account)
+
+    return account
+
+
+# Unfreeze account
+@router.patch("/{id}/unfreeze", response_model=AccountOut)
+def unfreeze_account(
+    id: UUID,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Unfreeze an account to allow transactions."""
+
+    account = db.query(Account).filter(
+        Account.id == id,
+        Account.user_id == current_user.id
+    ).first()
+
+    if not account:
+        raise HTTPException(status_code=404, detail="Account not found")
+
+    if account.status != AccountStatus.FROZEN:
+        raise HTTPException(
+            status_code=400,
+            detail="Account is not frozen"
+        )
+
+    account.status = AccountStatus.ACTIVE
+    db.commit()
+    db.refresh(account)
+
+    return account
+
+
+# Close account
+@router.patch("/{id}/close", response_model=AccountOut)
+def close_account(
+    id: UUID,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Close an account permanently. Account must have zero balance."""
+
+    account = db.query(Account).filter(
+        Account.id == id,
+        Account.user_id == current_user.id
+    ).first()
+
+    if not account:
+        raise HTTPException(status_code=404, detail="Account not found")
+
+    if account.status == AccountStatus.CLOSED:
+        raise HTTPException(
+            status_code=400,
+            detail="Account is already closed"
+        )
+
+    # Check for zero balance
+    if account.balance != 0:
+        raise HTTPException(
+            status_code=400,
+            detail="Cannot close account with non-zero balance. Please withdraw or transfer all funds first."
+        )
+
+    account.status = AccountStatus.CLOSED
+    db.commit()
+    db.refresh(account)
+
+    return account
+
+

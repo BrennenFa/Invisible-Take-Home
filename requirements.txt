@@ -1,6 +1,6 @@
 fastapi
 sqlalchemy
-dotenv
+python-dotenv
 passlib
 passlib[bcrypt]
 python-jose[cryptography]
@@ -10,3 +10,6 @@ uvicorn
 pytest
 pytest-asyncio
 bcrypt==4.0.1
+slowapi
+reportlab
+httpx

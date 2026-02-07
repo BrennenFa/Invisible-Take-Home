@@ -35,6 +35,7 @@ class AccountOut(BaseModel):
     type: str
     balance: float
     status: str
+    overdraft_limit: float
     created_at: datetime
 
     class Config:
@@ -85,3 +86,33 @@ class WithdrawalCreate(BaseModel):
     account_id: UUID
     amount: float
     description: Optional[str] = None
+
+
+class CardCreate(BaseModel):
+    account_id: UUID
+    card_holder_name: str
+    pin: str
+    card_type: str
+    spending_limit: Optional[float] = None
+
+
+class CardOut(BaseModel):
+    id: UUID
+    account_id: UUID
+    card_number: str
+    card_holder_name: str
+    expiry_date: datetime
+    card_type: str
+    status: str
+    spending_limit: Optional[float]
+    created_at: datetime
+
+    class Config:
+        orm_mode = True
+
+
+class CardPaymentCreate(BaseModel):
+    card_id: UUID
+    amount: float
+    description: Optional[str] = None
+    merchant: Optional[str] = None

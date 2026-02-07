@@ -1,12 +1,13 @@
 import os
 from dotenv import load_dotenv
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 from passlib.context import CryptContext
 from jose import jwt
 from datetime import datetime, timedelta
 from uuid import UUID
 from ..security import get_current_user
+from ..rate_limit import limiter
 
 from ..database import get_db
 from ..models import User
@@ -50,7 +51,8 @@ def create_access_token(user_id: UUID):
 # Auth routes
 # =================================================================
 @router.post("/signup", response_model=Token)
-def signup(user: UserCreate, db: Session = Depends(get_db)):
+@limiter.limit("5/minute")
+def signup(request: Request, user: UserCreate, db: Session = Depends(get_db)):
 
     # check if email exists - idempotency
     if db.query(User).filter(User.email == user.email).first():
@@ -73,7 +75,8 @@ def signup(user: UserCreate, db: Session = Depends(get_db)):
 
 
 @router.post("/login", response_model=Token)
-def login(user: UserCreate, db: Session = Depends(get_db)):
+@limiter.limit("10/minute")
+def login(request: Request, user: UserCreate, db: Session = Depends(get_db)):
 
     db_user = db.query(User).filter(User.email == user.email).first()
 
@@ -86,7 +89,8 @@ def login(user: UserCreate, db: Session = Depends(get_db)):
 
 
 @router.get("/me", response_model=UserOut)
-def me(current_user: User = Depends(get_current_user)):
+@limiter.limit("60/minute")
+def me(request: Request, current_user: User = Depends(get_current_user)):
     return current_user
 
 

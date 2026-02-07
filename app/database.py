@@ -5,11 +5,8 @@ from sqlalchemy.orm import sessionmaker, declarative_base
 
 load_dotenv()
 
-DB_URL = os.getenv("DB_URL")
-
-if not DB_URL:
-    raise ValueError("DB_URL is not set")
-
+# Default to SQLite database
+DB_URL = os.getenv("DB_URL", "sqlite:///./banking.db")
 
 engine = create_engine(
     DB_URL,

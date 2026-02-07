@@ -1,17 +1,19 @@
 from typing import List
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 from decimal import Decimal
+from uuid import UUID
 import uuid
 
 from ..database import get_db
 from ..models import Account, User, Transaction, TransactionDirection, AccountStatus, Transfer, TransactionCategory
 from ..schemas import TransferCreate, TransferOut
 from ..security import get_current_user
+from ..rate_limit import limiter
 
 
-router = APIRouter(prefix="/transfers", tags=["transfers"])
+router = APIRouter(prefix="/transfers", tags=["transfers"], dependencies=[Depends(limiter.limit("50/minute"))])
 
 
 @router.post("", response_model=TransferOut, status_code=201)
@@ -75,17 +77,18 @@ def create_transfer(
 
 
 
-        # Check sufficient balance
+        # Check sufficient balance (including overdraft)
         amount_decimal = Decimal(str(transfer.amount))
-        if source_account.balance < amount_decimal:
+        available_balance = source_account.balance + source_account.overdraft_limit
+        if available_balance < amount_decimal:
             raise HTTPException(
                 status_code=400,
-                detail=f"Insufficient balance. Available: {source_account.balance}"
+                detail=f"Insufficient funds. Available (including overdraft): {available_balance}"
             )
 
         # Generate transfer reference
-        transfer_id = str(uuid.uuid4())
-        transfer_ref = f"TRF-{transfer_id[:8]}"
+        transfer_id = uuid.uuid4()
+        transfer_ref = f"TRF-{str(transfer_id)[:8]}"
 
         # Create DEBIT transaction for source account
         debit_transaction = Transaction(
@@ -181,7 +184,7 @@ def get_transfers(
 
 @router.get("/{transfer_id}", response_model=TransferOut)
 def get_transfer_by_id(
-    transfer_id: str,
+    transfer_id: UUID,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
