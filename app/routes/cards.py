@@ -1,8 +1,9 @@
 from fastapi import APIRouter, Depends, HTTPException, Request
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 from typing import List
 from uuid import UUID
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from passlib.context import CryptContext
 import random
 
@@ -49,10 +50,10 @@ def create_card(
         )
 
     # Validate account exists and belongs to user
-    account = db.query(Account).filter(
+    account = db.execute(select(Account).filter(
         Account.id == card.account_id,
         Account.user_id == current_user.id
-    ).first()
+    )).scalar_one_or_none()
 
     if not account:
         raise HTTPException(
@@ -79,7 +80,7 @@ def create_card(
     card_number = None
     for _ in range(max_attempts):
         card_number = generate_card_number()
-        exists = db.query(Card).filter(Card.card_number == card_number).first()
+        exists = db.execute(select(Card).filter(Card.card_number == card_number)).scalar_one_or_none()
         if not exists:
             break
 
@@ -93,7 +94,7 @@ def create_card(
     pin_hash = pwd_context.hash(card.pin)
 
     # Set expiry date to 3 years from now
-    expiry_date = datetime.now(datetime.UTC) + timedelta(days=365 * 3)
+    expiry_date = datetime.now(timezone.utc) + timedelta(days=365 * 3)
 
     # Create card
     db_card = Card(
@@ -124,9 +125,9 @@ def get_cards(
 ):
     """Retrieve all cards for the current user's accounts."""
 
-    cards = db.query(Card).join(Account).filter(
+    cards = db.execute(select(Card).join(Account).filter(
         Account.user_id == current_user.id
-    ).all()
+    )).scalars().all()
 
     return cards
 
@@ -141,10 +142,10 @@ def get_card(
 ):
     """Get details for a specific card."""
 
-    card = db.query(Card).join(Account).filter(
+    card = db.execute(select(Card).join(Account).filter(
         Card.id == card_id,
         Account.user_id == current_user.id
-    ).first()
+    )).scalar_one_or_none()
 
     if not card:
         raise HTTPException(
@@ -165,10 +166,10 @@ def freeze_card(
 ):
     """Freeze a card to prevent transactions."""
 
-    card = db.query(Card).join(Account).filter(
+    card = db.execute(select(Card).join(Account).filter(
         Card.id == card_id,
         Account.user_id == current_user.id
-    ).first()
+    )).scalar_one_or_none()
 
     if not card:
         raise HTTPException(
@@ -205,10 +206,10 @@ def unfreeze_card(
 ):
     """Unfreeze a card to allow transactions."""
 
-    card = db.query(Card).join(Account).filter(
+    card = db.execute(select(Card).join(Account).filter(
         Card.id == card_id,
         Account.user_id == current_user.id
-    ).first()
+    )).scalar_one_or_none()
 
     if not card:
         raise HTTPException(
@@ -239,10 +240,10 @@ def cancel_card(
 ):
     """Cancel a card permanently."""
 
-    card = db.query(Card).join(Account).filter(
+    card = db.execute(select(Card).join(Account).filter(
         Card.id == card_id,
         Account.user_id == current_user.id
-    ).first()
+    )).scalar_one_or_none()
 
     if not card:
         raise HTTPException(

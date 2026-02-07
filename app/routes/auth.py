@@ -1,6 +1,7 @@
 import os
 from dotenv import load_dotenv
 from fastapi import APIRouter, Depends, HTTPException, Request
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 from passlib.context import CryptContext
 from jose import jwt
@@ -55,7 +56,7 @@ def create_access_token(user_id: UUID):
 def signup(request: Request, user: UserCreate, db: Session = Depends(get_db)):
 
     # check if email exists - idempotency
-    if db.query(User).filter(User.email == user.email).first():
+    if db.execute(select(User).filter(User.email == user.email)).scalar_one_or_none():
         raise HTTPException(status_code=400, detail="Email already registered")
 
     # create user
@@ -78,7 +79,7 @@ def signup(request: Request, user: UserCreate, db: Session = Depends(get_db)):
 @limiter.limit("10/minute")
 def login(request: Request, user: UserCreate, db: Session = Depends(get_db)):
 
-    db_user = db.query(User).filter(User.email == user.email).first()
+    db_user = db.execute(select(User).filter(User.email == user.email)).scalar_one_or_none()
 
     # validate user password
     if not db_user or not verify_password(user.password, db_user.hashed_password):

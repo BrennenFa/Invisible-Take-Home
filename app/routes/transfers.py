@@ -1,5 +1,6 @@
 from typing import List
 from fastapi import APIRouter, Depends, HTTPException, Request
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 from decimal import Decimal
@@ -27,6 +28,7 @@ def create_transfer(
     """
     Create a transfer between two accounts.
     """
+
     # validate that amount is positive
     if transfer.amount <= 0:
         raise HTTPException(status_code=400, detail="Amount must be positive")
@@ -40,10 +42,10 @@ def create_transfer(
 
     # database transaction for atomicity
     try:
-        # Fetch source account with row lock (concurrency) 
-        source_account = db.query(Account).filter(
+        # Fetch source account with row lock (concurrency)
+        source_account = db.execute(select(Account).filter(
             Account.id == transfer.source_account_id
-        ).with_for_update().first()
+        ).with_for_update()).scalar_one_or_none()
 
         if not source_account:
             raise HTTPException(status_code=404, detail="Source account not found")
@@ -63,9 +65,9 @@ def create_transfer(
             )
 
         # Fetch destination account with row lock
-        destination_account = db.query(Account).filter(
+        destination_account = db.execute(select(Account).filter(
             Account.id == transfer.destination_account_id
-        ).with_for_update().first()
+        ).with_for_update()).scalar_one_or_none()
 
         if not destination_account:
             raise HTTPException(status_code=404, detail="Destination account not found")
@@ -79,13 +81,12 @@ def create_transfer(
 
 
 
-        # Check sufficient balance (including overdraft)
+        # Check sufficient balance
         amount_decimal = Decimal(str(transfer.amount))
-        available_balance = source_account.balance + source_account.overdraft_limit
-        if available_balance < amount_decimal:
+        if source_account.balance < amount_decimal:
             raise HTTPException(
                 status_code=400,
-                detail=f"Insufficient funds. Available (including overdraft): {available_balance}"
+                detail=f"Insufficient funds. Available balance: {source_account.balance}"
             )
 
         # Generate transfer reference
@@ -177,12 +178,12 @@ def get_transfers(
     Retrieve all transfers involving the current user.
     """
     # We join with the Account model to filter by the user_id of the owners
-    transfers = db.query(Transfer).join(
-        Account, 
+    transfers = db.execute(select(Transfer).join(
+        Account,
         (Transfer.source_account_id == Account.id) | (Transfer.destination_account_id == Account.id)
     ).filter(
         Account.user_id == current_user.id
-    ).distinct().offset(skip).limit(limit).all()
+    ).distinct().offset(skip).limit(limit)).scalars().all()
 
     return transfers
 
@@ -197,14 +198,14 @@ def get_transfer_by_id(
     """
     Get details for a specific transfer.
     """
-    transfer = db.query(Transfer).filter(Transfer.id == transfer_id).first()
-    
+    transfer = db.execute(select(Transfer).filter(Transfer.id == transfer_id)).scalar_one_or_none()
+
     if not transfer:
         raise HTTPException(status_code=404, detail="Transfer not found")
 
     # Security check: Ensure the user owns one of the accounts involved
-    source_acc = db.query(Account).filter(Account.id == transfer.source_account_id).first()
-    dest_acc = db.query(Account).filter(Account.id == transfer.destination_account_id).first()
+    source_acc = db.execute(select(Account).filter(Account.id == transfer.source_account_id)).scalar_one_or_none()
+    dest_acc = db.execute(select(Account).filter(Account.id == transfer.destination_account_id)).scalar_one_or_none()
 
     if source_acc.user_id != current_user.id and dest_acc.user_id != current_user.id:
         raise HTTPException(

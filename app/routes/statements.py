@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import StreamingResponse, Response
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 from uuid import UUID
 from datetime import datetime
@@ -34,10 +35,10 @@ def generate_account_statement(
     """Generate account statement in JSON, CSV, or PDF format."""
 
     # Validate account ownership
-    account = db.query(Account).filter(
+    account = db.execute(select(Account).filter(
         Account.id == account_id,
         Account.user_id == current_user.id
-    ).first()
+    )).scalar_one_or_none()
 
     if not account:
         raise HTTPException(status_code=404, detail="Account not found")
@@ -50,17 +51,17 @@ def generate_account_statement(
         )
 
     # Fetch transactions in date range
-    transactions = db.query(Transaction).filter(
+    transactions = db.execute(select(Transaction).filter(
         Transaction.account_id == account_id,
         Transaction.created_at >= start_date,
         Transaction.created_at <= end_date
-    ).order_by(Transaction.created_at.asc()).all()
+    ).order_by(Transaction.created_at.asc())).scalars().all()
 
     # Calculate opening balance (all transactions before start_date)
-    opening_transactions = db.query(Transaction).filter(
+    opening_transactions = db.execute(select(Transaction).filter(
         Transaction.account_id == account_id,
         Transaction.created_at < start_date
-    ).all()
+    )).scalars().all()
 
     opening_balance = Decimal("0.00")
     for txn in opening_transactions:

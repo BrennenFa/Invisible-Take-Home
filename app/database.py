@@ -8,6 +8,7 @@ load_dotenv()
 # Default to SQLite database
 DB_URL = os.getenv("DB_URL", "sqlite:///./banking.db")
 
+# handle concurrency
 engine = create_engine(
     DB_URL,
     connect_args={"check_same_thread": False} if DB_URL.startswith("sqlite") else {}

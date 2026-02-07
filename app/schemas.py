@@ -17,7 +17,7 @@ class UserOut(BaseModel):
     email: EmailStr
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 class Token(BaseModel):
@@ -35,11 +35,10 @@ class AccountOut(BaseModel):
     type: str
     balance: float
     status: str
-    overdraft_limit: float
     created_at: datetime
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 class TransactionOut(BaseModel):
@@ -55,7 +54,7 @@ class TransactionOut(BaseModel):
     card_id: Optional[UUID]
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 class TransferCreate(BaseModel):
@@ -108,7 +107,7 @@ class CardOut(BaseModel):
     created_at: datetime
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 class CardPaymentCreate(BaseModel):

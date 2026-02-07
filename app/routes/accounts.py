@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, Request
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 from typing import List
 from uuid import UUID
@@ -56,7 +57,7 @@ def get_accounts(
     """
     Retrieve all accounts for the current user.
     """
-    accounts = db.query(Account).filter(Account.user_id == current_user.id).all()
+    accounts = db.execute(select(Account).filter(Account.user_id == current_user.id)).scalars().all()
     return accounts
 
 
@@ -73,10 +74,10 @@ def get_account(
     Get details for a specific account.
     """
     # validate that account belongs to user
-    account = db.query(Account).filter(
+    account = db.execute(select(Account).filter(
         Account.id == id,
         Account.user_id == current_user.id
-    ).first()
+    )).scalar_one_or_none()
 
     if not account:
         raise HTTPException(status_code=404, detail="Account not found")
@@ -96,17 +97,17 @@ def get_account_transactions(
     """
     Get all transactions for a specific account.
     """
-    account = db.query(Account).filter(
+    account = db.execute(select(Account).filter(
         Account.id == id,
         Account.user_id == current_user.id
-    ).first()
+    )).scalar_one_or_none()
 
     if not account:
         raise HTTPException(status_code=404, detail="Account not found")
 
-    transactions = db.query(Transaction).filter(
+    transactions = db.execute(select(Transaction).filter(
         Transaction.account_id == id
-    ).order_by(Transaction.created_at.desc()).all()
+    ).order_by(Transaction.created_at.desc())).scalars().all()
 
     return transactions
 
@@ -122,10 +123,10 @@ def freeze_account(
 ):
     """Freeze an account to prevent transactions."""
 
-    account = db.query(Account).filter(
+    account = db.execute(select(Account).filter(
         Account.id == id,
         Account.user_id == current_user.id
-    ).first()
+    )).scalar_one_or_none()
 
     if not account:
         raise HTTPException(status_code=404, detail="Account not found")
@@ -160,10 +161,10 @@ def unfreeze_account(
 ):
     """Unfreeze an account to allow transactions."""
 
-    account = db.query(Account).filter(
+    account = db.execute(select(Account).filter(
         Account.id == id,
         Account.user_id == current_user.id
-    ).first()
+    )).scalar_one_or_none()
 
     if not account:
         raise HTTPException(status_code=404, detail="Account not found")
@@ -192,10 +193,10 @@ def close_account(
 ):
     """Close an account permanently. Account must have zero balance."""
 
-    account = db.query(Account).filter(
+    account = db.execute(select(Account).filter(
         Account.id == id,
         Account.user_id == current_user.id
-    ).first()
+    )).scalar_one_or_none()
 
     if not account:
         raise HTTPException(status_code=404, detail="Account not found")

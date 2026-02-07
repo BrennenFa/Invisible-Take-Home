@@ -80,7 +80,6 @@ class Account(Base):
     type = Column(Enum(AccountType), nullable=False)
     balance = Column(Numeric(precision=10, scale=2), default=0.0, nullable=False)
     status = Column(Enum(AccountStatus), default=AccountStatus.ACTIVE, nullable=False)
-    overdraft_limit = Column(Numeric(precision=10, scale=2), default=0.0, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
 
     owner = relationship("User", back_populates="accounts")
@@ -102,8 +101,11 @@ class Transaction(Base):
     # transfer category and link
     category = Column(Enum(TransactionCategory), nullable=False, default=TransactionCategory.TRANSFER)
     card_id = Column(UUID(as_uuid=True), ForeignKey("cards.id"), nullable=True)
-    transfer_id = Column(UUID(as_uuid=True), ForeignKey("transfers.id"), nullable=True, use_alter=True)
-
+    transfer_id = Column(
+        UUID(as_uuid=True), 
+        ForeignKey("transfers.id", name="fk_transaction_transfer", use_alter=True), 
+        nullable=True
+    )
     account = relationship("Account", back_populates="transactions")
     transfer = relationship("Transfer", foreign_keys=[transfer_id])
     card = relationship("Card", foreign_keys=[card_id])

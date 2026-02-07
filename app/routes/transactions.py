@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 from decimal import Decimal
@@ -32,9 +33,9 @@ def create_deposit(
 
     try:
         # Fetch account with row lock
-        account = db.query(Account).filter(
+        account = db.execute(select(Account).filter(
             Account.id == deposit.account_id
-        ).with_for_update().first()
+        ).with_for_update()).scalar_one_or_none()
 
         if not account:
             raise HTTPException(status_code=404, detail="Account not found")
@@ -104,9 +105,9 @@ def create_withdrawal(
 
     try:
         # Fetch account with row lock
-        account = db.query(Account).filter(
+        account = db.execute(select(Account).filter(
             Account.id == withdrawal.account_id
-        ).with_for_update().first()
+        ).with_for_update()).scalar_one_or_none()
 
         if not account:
             raise HTTPException(status_code=404, detail="Account not found")
@@ -128,12 +129,11 @@ def create_withdrawal(
         # Convert amount to Decimal
         amount_decimal = Decimal(str(withdrawal.amount))
 
-        # Check sufficient balance (including overdraft)
-        available_balance = account.balance + account.overdraft_limit
-        if available_balance < amount_decimal:
+        # Check sufficient balance
+        if account.balance < amount_decimal:
             raise HTTPException(
                 status_code=400,
-                detail=f"Insufficient funds. Available (including overdraft): {available_balance}"
+                detail=f"Insufficient funds. Available balance: {account.balance}"
             )
 
         # Create DEBIT transaction (withdrawal removes money)
@@ -188,10 +188,10 @@ def create_card_payment(
 
     try:
         # Fetch card with account
-        card = db.query(Card).join(Account).filter(
+        card = db.execute(select(Card).join(Account).filter(
             Card.id == payment.card_id,
             Account.user_id == current_user.id
-        ).first()
+        )).scalar_one_or_none()
 
         if not card:
             raise HTTPException(
@@ -229,9 +229,9 @@ def create_card_payment(
                 )
 
         # Fetch account with row lock
-        account = db.query(Account).filter(
+        account = db.execute(select(Account).filter(
             Account.id == card.account_id
-        ).with_for_update().first()
+        ).with_for_update()).scalar_one_or_none()
 
         if not account:
             raise HTTPException(status_code=404, detail="Account not found")
@@ -246,12 +246,11 @@ def create_card_payment(
         # Convert amount to Decimal
         amount_decimal = Decimal(str(payment.amount))
 
-        # Check sufficient balance (including overdraft)
-        available_balance = account.balance + account.overdraft_limit
-        if available_balance < amount_decimal:
+        # Check sufficient balance
+        if account.balance < amount_decimal:
             raise HTTPException(
                 status_code=400,
-                detail=f"Insufficient funds. Available (including overdraft): {available_balance}"
+                detail=f"Insufficient funds. Available balance: {account.balance}"
             )
 
         # Create DEBIT transaction (card payment removes money)
@@ -303,17 +302,17 @@ def get_transactions(
     """Get transactions for the current user. Can filter by account_id, category, and date range."""
 
     # Start with base query - only transactions from user's accounts
-    query = db.query(Transaction).join(Account).filter(
+    stmt = select(Transaction).join(Account).filter(
         Account.user_id == current_user.id
     )
 
     # Apply filters
     if account_id:
         # Verify account belongs to user
-        account = db.query(Account).filter(
+        account = db.execute(select(Account).filter(
             Account.id == account_id,
             Account.user_id == current_user.id
-        ).first()
+        )).scalar_one_or_none()
 
         if not account:
             raise HTTPException(
@@ -321,12 +320,12 @@ def get_transactions(
                 detail="Account not found or you don't have access"
             )
 
-        query = query.filter(Transaction.account_id == account_id)
+        stmt = stmt.filter(Transaction.account_id == account_id)
 
     if category:
         try:
             category_enum = TransactionCategory[category.upper()]
-            query = query.filter(Transaction.category == category_enum)
+            stmt = stmt.filter(Transaction.category == category_enum)
         except KeyError:
             raise HTTPException(
                 status_code=400,
@@ -335,15 +334,15 @@ def get_transactions(
 
     # Date range filtering
     if start_date:
-        query = query.filter(Transaction.created_at >= start_date)
+        stmt = stmt.filter(Transaction.created_at >= start_date)
 
     if end_date:
-        query = query.filter(Transaction.created_at <= end_date)
+        stmt = stmt.filter(Transaction.created_at <= end_date)
 
     # Order by most recent first
-    query = query.order_by(Transaction.created_at.desc())
+    stmt = stmt.order_by(Transaction.created_at.desc())
 
     # Apply pagination
-    transactions = query.offset(offset).limit(limit).all()
+    transactions = db.execute(stmt.offset(offset).limit(limit)).scalars().all()
 
     return transactions
