@@ -13,7 +13,7 @@ from ..security import get_current_user
 from ..security import limiter
 
 
-router = APIRouter(prefix="/cards", tags=["cards"], dependencies=[Depends(limiter.limit("100/minute"))])
+router = APIRouter(prefix="/cards", tags=["cards"])
 
 # PIN hashing manager
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -30,7 +30,9 @@ def generate_cvv():
 
 
 @router.post("", response_model=CardOut, status_code=201)
+@limiter.limit("20/minute")
 def create_card(
+    request: Request,
     card: CardCreate,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
@@ -114,7 +116,9 @@ def create_card(
 
 
 @router.get("", response_model=List[CardOut])
+@limiter.limit("100/minute")
 def get_cards(
+    request: Request,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -128,7 +132,9 @@ def get_cards(
 
 
 @router.get("/{card_id}", response_model=CardOut)
+@limiter.limit("100/minute")
 def get_card(
+    request: Request,
     card_id: UUID,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
@@ -150,7 +156,9 @@ def get_card(
 
 
 @router.patch("/{card_id}/freeze", response_model=CardOut)
+@limiter.limit("20/minute")
 def freeze_card(
+    request: Request,
     card_id: UUID,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
@@ -188,7 +196,9 @@ def freeze_card(
 
 
 @router.patch("/{card_id}/unfreeze", response_model=CardOut)
+@limiter.limit("20/minute")
 def unfreeze_card(
+    request: Request,
     card_id: UUID,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
@@ -220,7 +230,9 @@ def unfreeze_card(
 
 
 @router.delete("/{card_id}", response_model=CardOut)
+@limiter.limit("20/minute")
 def cancel_card(
+    request: Request,
     card_id: UUID,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)

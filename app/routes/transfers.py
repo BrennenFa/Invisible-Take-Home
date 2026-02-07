@@ -13,11 +13,13 @@ from ..security import get_current_user
 from ..security import limiter
 
 
-router = APIRouter(prefix="/transfers", tags=["transfers"], dependencies=[Depends(limiter.limit("50/minute"))])
+router = APIRouter(prefix="/transfers", tags=["transfers"])
 
 
 @router.post("", response_model=TransferOut, status_code=201)
+@limiter.limit("30/minute")
 def create_transfer(
+    request: Request,
     transfer: TransferCreate,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
@@ -163,7 +165,9 @@ def create_transfer(
 
     
 @router.get("", response_model=List[TransferOut])
+@limiter.limit("100/minute")
 def get_transfers(
+    request: Request,
     skip: int = 0,
     limit: int = 100,
     current_user: User = Depends(get_current_user),
@@ -183,7 +187,9 @@ def get_transfers(
     return transfers
 
 @router.get("/{transfer_id}", response_model=TransferOut)
+@limiter.limit("100/minute")
 def get_transfer_by_id(
+    request: Request,
     transfer_id: UUID,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)

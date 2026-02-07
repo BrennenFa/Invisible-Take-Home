@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import StreamingResponse, Response
 from sqlalchemy.orm import Session
 from uuid import UUID
@@ -14,14 +14,16 @@ from reportlab.lib.units import inch
 
 from ..database import get_db
 from ..models import Account, User, Transaction, TransactionDirection
-from ..security import get_current_user
+from ..security import get_current_user, limiter
 
 
 router = APIRouter(prefix="/statements", tags=["statements"])
 
 
 @router.get("/account/{account_id}")
+@limiter.limit("30/minute")
 def generate_account_statement(
+    request: Request,
     account_id: UUID,
     start_date: datetime = Query(..., description="Statement start date (ISO format)"),
     end_date: datetime = Query(..., description="Statement end date (ISO format)"),

@@ -13,11 +13,13 @@ from ..security import limiter
 from datetime import datetime
 
 
-router = APIRouter(prefix="/transactions", tags=["transactions"], dependencies=[Depends(limiter.limit("100/minute"))])
+router = APIRouter(prefix="/transactions", tags=["transactions"])
 
 
 @router.post("/deposit", response_model=TransactionOut, status_code=201)
+@limiter.limit("50/minute")
 def create_deposit(
+    request: Request,
     deposit: DepositCreate,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
@@ -87,7 +89,9 @@ def create_deposit(
 
 
 @router.post("/withdrawal", response_model=TransactionOut, status_code=201)
+@limiter.limit("50/minute")
 def create_withdrawal(
+    request: Request,
     withdrawal: WithdrawalCreate,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
@@ -169,7 +173,9 @@ def create_withdrawal(
 
 
 @router.post("/card-payment", response_model=TransactionOut, status_code=201)
+@limiter.limit("50/minute")
 def create_card_payment(
+    request: Request,
     payment: CardPaymentCreate,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
@@ -282,7 +288,9 @@ def create_card_payment(
 
 
 @router.get("", response_model=List[TransactionOut])
+@limiter.limit("100/minute")
 def get_transactions(
+    request: Request,
     account_id: Optional[UUID] = Query(None, description="Filter by account ID"),
     category: Optional[str] = Query(None, description="Filter by category (TRANSFER, DEPOSIT, WITHDRAWAL, CARD_PAYMENT)"),
     start_date: Optional[datetime] = Query(None, description="Filter transactions from this date (ISO format)"),

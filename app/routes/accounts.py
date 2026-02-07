@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 from typing import List
 from uuid import UUID
@@ -10,11 +10,13 @@ from ..security import get_current_user
 from ..security import limiter
 
 # accounts routes
-router = APIRouter(prefix="/accounts", tags=["accounts"], dependencies=[Depends(limiter.limit("100/minute"))])
+router = APIRouter(prefix="/accounts", tags=["accounts"])
 
 # Create account
 @router.post("", response_model=AccountOut, status_code=201)
+@limiter.limit("20/minute")
 def create_account(
+    request: Request,
     account: AccountCreate,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
@@ -45,7 +47,9 @@ def create_account(
 
 # Get accounts for current user
 @router.get("", response_model=List[AccountOut])
+@limiter.limit("100/minute")
 def get_accounts(
+    request: Request,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -58,7 +62,9 @@ def get_accounts(
 
 # Get specific account by ID
 @router.get("/{id}", response_model=AccountOut)
+@limiter.limit("100/minute")
 def get_account(
+    request: Request,
     id: UUID,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
@@ -80,7 +86,9 @@ def get_account(
 
 # Get account transations
 @router.get("/{id}/transactions", response_model=List[TransactionOut])
+@limiter.limit("100/minute")
 def get_account_transactions(
+    request: Request,
     id: UUID,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
@@ -105,7 +113,9 @@ def get_account_transactions(
 
 # Freeze account
 @router.patch("/{id}/freeze", response_model=AccountOut)
+@limiter.limit("20/minute")
 def freeze_account(
+    request: Request,
     id: UUID,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
@@ -141,7 +151,9 @@ def freeze_account(
 
 # Unfreeze account
 @router.patch("/{id}/unfreeze", response_model=AccountOut)
+@limiter.limit("20/minute")
 def unfreeze_account(
+    request: Request,
     id: UUID,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
@@ -171,7 +183,9 @@ def unfreeze_account(
 
 # Close account
 @router.patch("/{id}/close", response_model=AccountOut)
+@limiter.limit("20/minute")
 def close_account(
+    request: Request,
     id: UUID,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
