@@ -195,13 +195,48 @@ class CardCreate(BaseModel):
 class CardOut(BaseModel):
     id: UUID
     account_id: UUID
-    card_number: str
+    card_number_masked: str  # Only last 4 digits shown
     card_holder_name: str
     expiry_date: datetime
     card_type: CardType
     status: CardStatus
     spending_limit: Optional[float]
     created_at: datetime
+
+    @classmethod
+    def from_card(cls, card):
+        """Create CardOut from Card model with masked card number."""
+        return cls(
+            id=card.id,
+            account_id=card.account_id,
+            # mask card for security: show only last 4 digits
+            card_number_masked=f"****-****-****-{card.card_number[-4:]}",
+            card_holder_name=card.card_holder_name,
+            expiry_date=card.expiry_date,
+            card_type=card.card_type,
+            status=card.status,
+            spending_limit=card.spending_limit,
+            created_at=card.created_at
+        )
+
+    class Config:
+        from_attributes = True
+
+
+class CardCreateResponse(BaseModel):
+    """Response when creating a new card -- only instance where cvv is shared ."""
+    id: UUID
+    account_id: UUID
+    card_number: str
+    card_holder_name: str
+    # Only returned at creation, never stored or retrievable again (compliance)
+    cvv: str  
+    expiry_date: datetime
+    card_type: CardType
+    status: CardStatus
+    spending_limit: Optional[float]
+    created_at: datetime
+    message: str = "IMPORTANT: Save your CVV securely. It cannot be retrieved later."
 
     class Config:
         from_attributes = True

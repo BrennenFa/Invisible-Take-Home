@@ -25,7 +25,7 @@ def create_account(
     """
     Create a new account for the current user.
     """
-    # account.type is already validated as AccountType enum by Pydantic
+
     db_account = Account(
         user_id=current_user.id,
         type=account.type,

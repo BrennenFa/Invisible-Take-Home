@@ -9,6 +9,7 @@ pydantic[email]
 uvicorn
 pytest
 pytest-asyncio
+pytest-cov
 bcrypt==4.0.1
 slowapi
 reportlab

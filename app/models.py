@@ -102,8 +102,8 @@ class Transaction(Base):
     category = Column(Enum(TransactionCategory), nullable=False, default=TransactionCategory.TRANSFER)
     card_id = Column(UUID(as_uuid=True), ForeignKey("cards.id"), nullable=True)
     transfer_id = Column(
-        UUID(as_uuid=True), 
-        ForeignKey("transfers.id", name="fk_transaction_transfer", use_alter=True), 
+        UUID(as_uuid=True),
+        ForeignKey("transfers.id", name="fk_transaction_transfer", use_alter=True),
         nullable=True
     )
     account = relationship("Account", back_populates="transactions")
@@ -131,7 +131,7 @@ class Card(Base):
     account_id = Column(UUID(as_uuid=True), ForeignKey("accounts.id"), nullable=False)
     card_number = Column(String, unique=True, nullable=False)
     card_holder_name = Column(String, nullable=False)
-    cvv = Column(String, nullable=False)
+    # NO CVV - generated, not stored for compliance
     pin_hash = Column(String, nullable=False)
     card_type = Column(Enum(CardType), nullable=False)
     expiry_date = Column(DateTime, nullable=False)
