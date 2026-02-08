@@ -25,17 +25,10 @@ def create_account(
     """
     Create a new account for the current user.
     """
-    try:
-        account_type = AccountType[account.type.upper()]
-    except KeyError:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Invalid account type. Must be one of: {', '.join([t.name for t in AccountType])}"
-        )
-
+    # account.type is already validated as AccountType enum by Pydantic
     db_account = Account(
         user_id=current_user.id,
-        type=account_type,
+        type=account.type,
         balance=0.0,
         status=AccountStatus.ACTIVE
     )

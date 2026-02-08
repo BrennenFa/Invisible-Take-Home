@@ -40,14 +40,7 @@ def create_card(
 ):
     """Create a new card for an account."""
 
-    # Validate card type
-    try:
-        card_type = CardType[card.card_type.upper()]
-    except KeyError:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Invalid card type. Must be one of: {', '.join([t.name for t in CardType])}"
-        )
+    # card.card_type is already validated as CardType enum by Pydantic
 
     # Validate account exists and belongs to user
     account = db.execute(select(Account).filter(
@@ -103,7 +96,7 @@ def create_card(
         card_holder_name=card.card_holder_name,
         cvv=cvv,
         pin_hash=pin_hash,
-        card_type=card_type,
+        card_type=card.card_type,
         expiry_date=expiry_date,
         status=CardStatus.ACTIVE,
         spending_limit=card.spending_limit

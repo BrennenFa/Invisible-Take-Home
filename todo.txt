@@ -14,3 +14,8 @@ TODO
 2. auth 
 3. admin?
 
+
+
+extra features
+1. spending limit
+2. overdraft limit
