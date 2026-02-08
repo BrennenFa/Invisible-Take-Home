@@ -12,3 +12,4 @@
 
 
 # Areas where human intervention was needed
+1. os.getnenv() --> leaked db location

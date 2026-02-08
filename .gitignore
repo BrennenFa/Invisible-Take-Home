@@ -34,3 +34,10 @@ htmlcov/
 curl/
 db/*
 AI_USAGE.md
+
+
+# Ignore SQLite temporary files
+*.db-wal
+*.db-shm
+*.db-journal
+CLAUDE.md

@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, DateTime, ForeignKey, Numeric, Enum
+from sqlalchemy import Column, String, DateTime, ForeignKey, Numeric, Enum, Index
 from sqlalchemy.orm import relationship
 from datetime import datetime
 from .database import Base
@@ -74,6 +74,10 @@ class User(Base):
 
 class Account(Base):
     __tablename__ = "accounts"
+    __table_args__ = (
+        Index('ix_account_user_id', 'user_id'),
+        Index('ix_account_created_at', 'created_at'),
+    )
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
     user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
@@ -89,6 +93,12 @@ class Account(Base):
 
 class Transaction(Base):
     __tablename__ = "transactions"
+    __table_args__ = (
+        Index('ix_transaction_account_id', 'account_id'),
+        Index('ix_transaction_created_at', 'created_at'),
+        Index('ix_transaction_card_id', 'card_id'),
+        Index('ix_transaction_category', 'category'),
+    )
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
     account_id = Column(UUID(as_uuid=True), ForeignKey("accounts.id"), nullable=False)
@@ -113,6 +123,11 @@ class Transaction(Base):
 
 class Transfer(Base):
     __tablename__ = "transfers"
+    __table_args__ = (
+        Index('ix_transfer_source_account', 'source_account_id'),
+        Index('ix_transfer_dest_account', 'destination_account_id'),
+        Index('ix_transfer_created_at', 'created_at'),
+    )
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     source_account_id = Column(UUID(as_uuid=True), ForeignKey("accounts.id"), nullable=False)
@@ -126,6 +141,11 @@ class Transfer(Base):
 
 class Card(Base):
     __tablename__ = "cards"
+    __table_args__ = (
+        Index('ix_card_account_id', 'account_id'),
+        Index('ix_card_status', 'status'),
+        Index('ix_card_expiry_date', 'expiry_date'),
+    )
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
     account_id = Column(UUID(as_uuid=True), ForeignKey("accounts.id"), nullable=False)
