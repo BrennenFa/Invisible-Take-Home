@@ -32,7 +32,7 @@ def set_sqlite_pragma(dbapi_conn, connection_record):
     # ensure all data is written in case of errors
     cursor.execute("PRAGMA synchronous=FULL")
     # if the lock is busy, wait up to 2 seconds before throwing an error
-    cursor.execute("PRAGMA busy_timeout=2s000")
+    cursor.execute("PRAGMA busy_timeout=2000")
     # Cache size
     cursor.execute("PRAGMA cache_size=-64000")
     cursor.close()
@@ -48,3 +48,43 @@ def get_db():
         yield db
     finally:
         db.close()
+
+
+
+# =================================================================
+# Backup Utilities (note: not used, just for demonstration)
+# =================================================================
+
+def prepare_for_backup():
+    """Checkpoint WAL before backup to ensure consistency."""
+    conn = engine.raw_connection()
+    cursor = conn.cursor()
+    # RESTART mode: checkpoint everything and restart WAL
+    cursor.execute("PRAGMA wal_checkpoint(RESTART)")
+    cursor.close()
+    conn.close()
+
+
+def backup_database():
+    """Create a timestamped backup of the database."""
+    import shutil
+    from datetime import datetime
+
+    # Checkpoint WAL first
+    prepare_for_backup()
+
+    # Get backup directory from env or default to backup/
+    backup_dir = os.getenv("BACKUP_DIR", "backup")
+
+    # Get DB path from DB_URL
+    db_path = DB_URL.replace("sqlite:///", "")
+
+    # Create backup directory
+    os.makedirs(backup_dir, exist_ok=True)
+
+    # Create timestamped backup
+    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+    backup_path = os.path.join(backup_dir, f"backup_{timestamp}.db")
+
+    shutil.copy2(db_path, backup_path)
+    return backup_path

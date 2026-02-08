@@ -33,6 +33,7 @@ htmlcov/
 # Project specific
 curl/
 db/*
+backup/
 AI_USAGE.md
 
 
