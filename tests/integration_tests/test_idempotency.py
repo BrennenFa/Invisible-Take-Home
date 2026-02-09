@@ -19,9 +19,10 @@ def test_duplicate_transfer_same_idempotency_key(authenticated_client):
     dest_acc = client.post("/accounts", headers=headers, json={"type": "SAVINGS"}).json()
 
     # Deposit initial balance
+    headers_with_idem = {**headers, "Idempotency-Key": str(uuid.uuid4())}
     client.post(
         "/transactions/deposit",
-        headers=headers,
+        headers=headers_with_idem,
         json={"account_id": source_acc["id"], "amount": 200.0, "description": "Initial deposit"}
     )
 
@@ -75,9 +76,10 @@ def test_different_idempotency_keys_create_different_transfers(authenticated_cli
     dest_acc = client.post("/accounts", headers=headers, json={"type": "SAVINGS"}).json()
 
     # Deposit initial balance
+    headers_with_idem = {**headers, "Idempotency-Key": str(uuid.uuid4())}
     client.post(
         "/transactions/deposit",
-        headers=headers,
+        headers=headers_with_idem,
         json={"account_id": source_acc["id"], "amount": 500.0, "description": "Initial deposit"}
     )
 
@@ -114,16 +116,17 @@ def test_different_idempotency_keys_create_different_transfers(authenticated_cli
 
 def test_transfer_without_idempotency_key(authenticated_client):
     """
-    Test that transfers work without Idempotency-Key header (optional).
+    Test that transfers REQUIRE Idempotency-Key header.
     """
     client, headers, _ = authenticated_client
 
     source_acc = client.post("/accounts", headers=headers, json={"type": "CHECKING"}).json()
     dest_acc = client.post("/accounts", headers=headers, json={"type": "SAVINGS"}).json()
 
+    headers_with_idem = {**headers, "Idempotency-Key": str(uuid.uuid4())}
     client.post(
         "/transactions/deposit",
-        headers=headers,
+        headers=headers_with_idem,
         json={"account_id": source_acc["id"], "amount": 100.0, "description": "Initial deposit"}
     )
 
@@ -134,9 +137,10 @@ def test_transfer_without_idempotency_key(authenticated_client):
         "description": "Transfer without idempotency key"
     }
 
+    # Without Idempotency-Key header, transfer should fail
     response = client.post("/transfers", headers=headers, json=transfer_data)
-    assert response.status_code == 201
-    assert response.json()["amount"] == 50.0
+    assert response.status_code == 400
+    assert "Idempotency-Key header is required" in response.json()["detail"]
 
 
 def test_idempotency_with_network_glitch_simulation(authenticated_client):
@@ -149,9 +153,10 @@ def test_idempotency_with_network_glitch_simulation(authenticated_client):
     source_acc = client.post("/accounts", headers=headers, json={"type": "CHECKING"}).json()
     dest_acc = client.post("/accounts", headers=headers, json={"type": "SAVINGS"}).json()
 
+    headers_with_idem = {**headers, "Idempotency-Key": str(uuid.uuid4())}
     client.post(
         "/transactions/deposit",
-        headers=headers,
+        headers=headers_with_idem,
         json={"account_id": source_acc["id"], "amount": 300.0, "description": "Initial deposit"}
     )
 
@@ -200,9 +205,10 @@ def test_idempotency_prevents_double_charging(authenticated_client):
     initial_balance = 1000.0
     transfer_amount = 250.0
 
+    headers_with_idem = {**headers, "Idempotency-Key": str(uuid.uuid4())}
     client.post(
         "/transactions/deposit",
-        headers=headers,
+        headers=headers_with_idem,
         json={"account_id": source_acc["id"], "amount": initial_balance, "description": "Initial deposit"}
     )
 
@@ -253,9 +259,10 @@ def test_failed_transfer_cached_error(authenticated_client):
     dest_acc = client.post("/accounts", headers=headers, json={"type": "SAVINGS"}).json()
 
     # Deposit only $50 (not enough for $100 transfer)
+    headers_with_idem = {**headers, "Idempotency-Key": str(uuid.uuid4())}
     client.post(
         "/transactions/deposit",
-        headers=headers,
+        headers=headers_with_idem,
         json={"account_id": source_acc["id"], "amount": 50.0, "description": "Limited deposit"}
     )
 
@@ -293,9 +300,10 @@ def test_multiple_retries_same_idempotency_key(authenticated_client):
     source_acc = client.post("/accounts", headers=headers, json={"type": "CHECKING"}).json()
     dest_acc = client.post("/accounts", headers=headers, json={"type": "SAVINGS"}).json()
 
+    headers_with_idem = {**headers, "Idempotency-Key": str(uuid.uuid4())}
     client.post(
         "/transactions/deposit",
-        headers=headers,
+        headers=headers_with_idem,
         json={"account_id": source_acc["id"], "amount": 500.0, "description": "Initial deposit"}
     )
 

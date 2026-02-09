@@ -15,12 +15,8 @@ engine = create_engine(
     DB_URL,
     connect_args={
         "check_same_thread": False,
-        "timeout": 5  # Reduced to 5s (better for banking apps)
+        "timeout": 20
     },
-    pool_size=5, 
-    max_overflow=10,
-    # check if connection is alive
-    pool_pre_ping=True
 )
 
 
@@ -29,7 +25,7 @@ engine = create_engine(
 @event.listens_for(engine, "connect")
 def set_sqlite_pragma(dbapi_conn, connection_record):
     cursor = dbapi_conn.cursor()
-    # Enable WAL (Write-Ahead Logging) mode
+    # Enable WAL (so -Ahead Logging) mode
     cursor.execute("PRAGMA journal_mode=WAL")
     # ensure all data is written in case of errors
     cursor.execute("PRAGMA synchronous=FULL")
@@ -61,10 +57,6 @@ def prepare_for_backup():
     """Checkpoint WAL before backup to ensure consistency."""
     conn = engine.raw_connection()
     cursor = conn.cursor()
-<<<<<<< HEAD
-
-=======
->>>>>>> e6ecf58de01bb27f8dfd2d915429910e002d504c
     # RESTART mode: checkpoint everything and restart WAL
     cursor.execute("PRAGMA wal_checkpoint(RESTART)")
     cursor.close()
@@ -73,22 +65,12 @@ def prepare_for_backup():
 
 def backup_database():
     """Create a timestamped backup of the database."""
-<<<<<<< HEAD
-=======
-    import shutil
-    from datetime import datetime
->>>>>>> e6ecf58de01bb27f8dfd2d915429910e002d504c
 
     # Checkpoint WAL first
     prepare_for_backup()
 
-<<<<<<< HEAD
     # Get backup directory
     backup_dir = os.getenv("BACKUP_DIR")
-=======
-    # Get backup directory from env or default to backup/
-    backup_dir = os.getenv("BACKUP_DIR", "backup")
->>>>>>> e6ecf58de01bb27f8dfd2d915429910e002d504c
 
     # Get DB path from DB_URL
     db_path = DB_URL.replace("sqlite:///", "")

@@ -38,18 +38,24 @@ def create_deposit(
         raise HTTPException(status_code=400, detail="Amount must be positive")
 
     try:
-        # Try to insert idempotency record - only one allowed
-        idempotency_record = IdempotencyKey(
-            idempotency_key=idempotency_key,
-            user_id=current_user.id,
-            endpoint="POST /transactions/deposit",
-            response_code=0,
-            response_body=""
-        )
-        db.add(idempotency_record)
-        db.flush()
+        # Check if idempotency key already exists (request was already processed)
+        existing_record = db.execute(
+            select(IdempotencyKey).filter(
+                IdempotencyKey.idempotency_key == idempotency_key,
+                IdempotencyKey.user_id == current_user.id
+            )
+        ).scalar_one_or_none()
 
-        # Successfully inserted - first request, execute deposit
+        if existing_record:
+            # Return cached response
+            if existing_record.response_code != 201:
+                response_data = json.loads(existing_record.response_body)
+                raise HTTPException(
+                    status_code=existing_record.response_code,
+                    detail=response_data.get("detail", "Cached error response")
+                )
+            return TransactionOut(**json.loads(existing_record.response_body))
+
         # Fetch account with row lock
         account = db.execute(select(Account).filter(
             Account.id == deposit.account_id
@@ -91,45 +97,21 @@ def create_deposit(
         # Update account balance
         account.balance += amount_decimal
 
-        # Store response in idempotency record
+        # Create and store idempotency record
         transaction_response = TransactionOut.from_orm(transaction)
-        idempotency_record.response_code = 201
-        idempotency_record.response_body = transaction_response.model_dump_json()
+        idempotency_record = IdempotencyKey(
+            idempotency_key=idempotency_key,
+            user_id=current_user.id,
+            endpoint="POST /transactions/deposit",
+            response_code=201,
+            response_body=transaction_response.model_dump_json()
+        )
+        db.add(idempotency_record)
 
         db.commit()
         db.refresh(transaction)
 
         return transaction
-
-    except IntegrityError as e:
-        db.rollback()
-
-        # Check if error is due to duplicate idempotency key
-        if "idempotency_key" in str(e).lower():
-            # Fetch cached response
-            cached = db.execute(
-                select(IdempotencyKey).filter(
-                    IdempotencyKey.idempotency_key == idempotency_key,
-                    IdempotencyKey.user_id == current_user.id
-                )
-            ).scalar_one_or_none()
-
-            if not cached:
-                raise HTTPException(status_code=500, detail="Idempotency key check failed")
-
-            # Original request failed - return same error
-            if cached.response_code != 201:
-                response_data = json.loads(cached.response_body)
-                raise HTTPException(
-                    status_code=cached.response_code,
-                    detail=response_data.get("detail", "Cached error response")
-                )
-
-            # Original request succeeded - return original message body
-            return TransactionOut(**json.loads(cached.response_body))
-
-        # Different integrity error
-        raise HTTPException(status_code=400, detail="Database integrity error")
 
     except HTTPException:
         db.rollback()
@@ -159,18 +141,24 @@ def create_withdrawal(
         raise HTTPException(status_code=400, detail="Amount must be positive")
 
     try:
-        # Try to insert idempotency record
-        idempotency_record = IdempotencyKey(
-            idempotency_key=idempotency_key,
-            user_id=current_user.id,
-            endpoint="POST /transactions/withdrawal",
-            response_code=0,
-            response_body=""
-        )
-        db.add(idempotency_record)
-        db.flush()
+        # Check if idempotency key already exists (request was already processed)
+        existing_record = db.execute(
+            select(IdempotencyKey).filter(
+                IdempotencyKey.idempotency_key == idempotency_key,
+                IdempotencyKey.user_id == current_user.id
+            )
+        ).scalar_one_or_none()
 
-        # Successfully inserted - first request, execute withdrawal
+        if existing_record:
+            # Return cached response
+            if existing_record.response_code != 201:
+                response_data = json.loads(existing_record.response_body)
+                raise HTTPException(
+                    status_code=existing_record.response_code,
+                    detail=response_data.get("detail", "Cached error response")
+                )
+            return TransactionOut(**json.loads(existing_record.response_body))
+
         # Fetch account with row lock
         account = db.execute(select(Account).filter(
             Account.id == withdrawal.account_id
@@ -219,45 +207,21 @@ def create_withdrawal(
         # Update account balance
         account.balance -= amount_decimal
 
-        # Store response in idempotency record
+        # Create and store idempotency record
         transaction_response = TransactionOut.from_orm(transaction)
-        idempotency_record.response_code = 201
-        idempotency_record.response_body = transaction_response.model_dump_json()
+        idempotency_record = IdempotencyKey(
+            idempotency_key=idempotency_key,
+            user_id=current_user.id,
+            endpoint="POST /transactions/withdrawal",
+            response_code=201,
+            response_body=transaction_response.model_dump_json()
+        )
+        db.add(idempotency_record)
 
         db.commit()
         db.refresh(transaction)
 
         return transaction
-
-    except IntegrityError as e:
-        db.rollback()
-
-        # Check if this is idempotency key constraint violation
-        if "idempotency_key" in str(e).lower():
-            # Fetch cached response
-            cached = db.execute(
-                select(IdempotencyKey).filter(
-                    IdempotencyKey.idempotency_key == idempotency_key,
-                    IdempotencyKey.user_id == current_user.id
-                )
-            ).scalar_one_or_none()
-
-            if not cached:
-                raise HTTPException(status_code=500, detail="Idempotency key check failed")
-
-            # Original request failed - return same error
-            if cached.response_code != 201:
-                response_data = json.loads(cached.response_body)
-                raise HTTPException(
-                    status_code=cached.response_code,
-                    detail=response_data.get("detail", "Cached error response")
-                )
-
-            # Original request succeeded - return orignal message body
-            return TransactionOut(**json.loads(cached.response_body))
-
-        # Different integrity error - re-raise
-        raise HTTPException(status_code=400, detail="Database integrity error")
 
     except HTTPException:
         db.rollback()

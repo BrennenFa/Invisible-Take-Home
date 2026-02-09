@@ -2,11 +2,13 @@ from typing import List
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy import select
 from sqlalchemy.orm import Session
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.exc import IntegrityError, InvalidRequestError
 from decimal import Decimal
 from uuid import UUID
+from datetime import datetime
 import uuid
 import json
+import time
 
 from ..database import get_db
 from ..models import Account, User, Transaction, TransactionDirection, AccountStatus, Transfer, TransactionCategory, IdempotencyKey
@@ -37,7 +39,7 @@ def create_transfer(
         raise HTTPException(status_code=400, detail="Idempotency-Key header is required")
 
     try:
-        # Try to insert idempotency record
+        # Try to insert idempotency record first (acts as a lock)
         idempotency_record = IdempotencyKey(
             idempotency_key=idempotency_key,
             user_id=current_user.id,
@@ -46,11 +48,9 @@ def create_transfer(
             response_body=""
         )
         db.add(idempotency_record)
-        # Force check for duplicate key (unallowed)
+        # flush will raise integrity error if key already exists
         db.flush()
-    
 
-        # Successfully inserted - first request, execute transfer
         # Validate amount
         if transfer.amount <= 0:
             raise HTTPException(status_code=400, detail="Amount must be positive")
@@ -62,13 +62,21 @@ def create_transfer(
                 detail="Source and destination accounts must be different"
             )
 
-        # Fetch source account with row lock
-        source_account = db.execute(select(Account).filter(
-            Account.id == transfer.source_account_id
-        ).with_for_update()).scalar_one_or_none()
+        # Lock accounts to prevent deadlock
+        account_ids = sorted([transfer.source_account_id, transfer.destination_account_id])
+        locked_accounts = {}
+        for acc_id in account_ids:
+            acc = db.execute(select(Account).filter(
+                Account.id == acc_id
+            ).with_for_update()).scalar_one_or_none()
 
-        if not source_account:
-            raise HTTPException(status_code=404, detail="Source account not found")
+            if not acc:
+                raise HTTPException(status_code=404, detail="Account not found")
+
+            locked_accounts[acc_id] = acc
+
+        source_account = locked_accounts[transfer.source_account_id]
+        destination_account = locked_accounts[transfer.destination_account_id]
 
         # Verify source account belongs to current user
         if source_account.user_id != current_user.id:
@@ -77,22 +85,13 @@ def create_transfer(
                 detail="You do not have permission to transfer from this account"
             )
 
-        # Check source account is active
+        # Check both accounts are active
         if source_account.status != AccountStatus.ACTIVE:
             raise HTTPException(
                 status_code=400,
                 detail="Source account is not active"
             )
 
-        # Fetch destination account with row lock
-        destination_account = db.execute(select(Account).filter(
-            Account.id == transfer.destination_account_id
-        ).with_for_update()).scalar_one_or_none()
-
-        if not destination_account:
-            raise HTTPException(status_code=404, detail="Destination account not found")
-
-        # Check destination account is active
         if destination_account.status != AccountStatus.ACTIVE:
             raise HTTPException(
                 status_code=400,
@@ -107,70 +106,73 @@ def create_transfer(
                 detail=f"Insufficient funds. Available balance: {source_account.balance}"
             )
 
-        # Generate transfer reference
+        # Pre-generate all UUIDs in memory (no database calls)
         transfer_id = uuid.uuid4()
+        debit_txn_id = uuid.uuid4()
+        credit_txn_id = uuid.uuid4()
         transfer_ref = f"TRF-{str(transfer_id)[:8]}"
+        created_at = datetime.utcnow()
 
-        # Create DEBIT transaction for source account
+        # Update account balances
+        source_account.balance -= amount_decimal
+        destination_account.balance += amount_decimal
+
+        # Create all objects in memory (before any more database writes)
         debit_transaction = Transaction(
+            id=debit_txn_id,
             account_id=source_account.id,
             type=TransactionDirection.DEBIT,
             amount=amount_decimal,
             description=transfer.description or f"Transfer to account {destination_account.id}",
             reference=transfer_ref,
             category=TransactionCategory.TRANSFER,
-            transfer_id=transfer_id
+            transfer_id=transfer_id,
+            created_at=created_at
         )
-        db.add(debit_transaction)
-        db.flush()
 
-        # Create CREDIT transaction for destination account
         credit_transaction = Transaction(
+            id=credit_txn_id,
             account_id=destination_account.id,
             type=TransactionDirection.CREDIT,
             amount=amount_decimal,
             description=transfer.description or f"Transfer from account {source_account.id}",
             reference=transfer_ref,
             category=TransactionCategory.TRANSFER,
-            transfer_id=transfer_id
+            transfer_id=transfer_id,
+            created_at=created_at
         )
-        db.add(credit_transaction)
-        db.flush()
 
-        # Update account balances atomically
-        source_account.balance -= amount_decimal
-        destination_account.balance += amount_decimal
-
-        # Create transfer record
         db_transfer = Transfer(
             id=transfer_id,
             source_account_id=source_account.id,
             destination_account_id=destination_account.id,
             amount=amount_decimal,
             description=transfer.description,
-            source_transaction_id=debit_transaction.id,
-            destination_transaction_id=credit_transaction.id
+            source_transaction_id=debit_txn_id,
+            destination_transaction_id=credit_txn_id,
+            created_at=created_at
         )
-        db.add(db_transfer)
 
-        # Create response
+        # Single atomic write
+        db.add_all([debit_transaction, credit_transaction, db_transfer])
+
+        # Create response (use our pre-generated timestamp)
         transfer_result = TransferOut(
             id=db_transfer.id,
             source_account_id=db_transfer.source_account_id,
             destination_account_id=db_transfer.destination_account_id,
             amount=float(db_transfer.amount),
             description=db_transfer.description,
-            created_at=db_transfer.created_at,
+            created_at=created_at,
             source_transaction_id=db_transfer.source_transaction_id,
             destination_transaction_id=db_transfer.destination_transaction_id
         )
 
-        # Store response in idempotency record
+        # Store response in idempotency record and commit atomically
         idempotency_record.response_code = 201
         idempotency_record.response_body = transfer_result.model_dump_json()
         idempotency_record.transfer_id = db_transfer.id
 
-        # Commit everything atomically
         db.commit()
         db.refresh(db_transfer)
 
@@ -182,39 +184,57 @@ def create_transfer(
 
         # Check if this is idempotency key constraint violation
         if "idempotency_key" in str(e).lower():
-            # Fetch cached response
-            cached = db.execute(
-                select(IdempotencyKey).filter(
-                    IdempotencyKey.idempotency_key == idempotency_key,
-                    IdempotencyKey.user_id == current_user.id
-                )
-            ).scalar_one_or_none()
+            # Another concurrent request is processing or has completed
+            # Wait for it to finish and return its result
+            max_wait = 5
+            poll_interval = 0.1
+            elapsed = 0
 
-            if not cached:
-                raise HTTPException(status_code=500, detail="Idempotency key check failed")
+            while elapsed < max_wait:
+                # Fetch cached response
+                cached = db.execute(
+                    select(IdempotencyKey).filter(
+                        IdempotencyKey.idempotency_key == idempotency_key,
+                        IdempotencyKey.user_id == current_user.id
+                    )
+                ).scalar_one_or_none()
 
-            # Original request failed - return same error
-            if cached.response_code != 201:
-                # Original request failed - return same error
-                response_data = json.loads(cached.response_body)
-                raise HTTPException(
-                    status_code=cached.response_code,
-                    detail=response_data.get("detail", "Cached error response")
-                )
+                if not cached:
+                    raise HTTPException(status_code=500, detail="Idempotency key check failed")
 
-            # Original request succeeded - return message body
-            return TransferOut(**json.loads(cached.response_body))
+                # Wait til response is ready
+                if cached.response_code == 0:
+                    time.sleep(poll_interval)
+                    elapsed += poll_interval
+                    continue
 
+                # First request completed - return its response
+                if cached.response_code == 201:
+                    return TransferOut(**json.loads(cached.response_body))
+                else:
+                    # First request failed - return same error
+                    response_data = json.loads(cached.response_body)
+                    raise HTTPException(
+                        status_code=cached.response_code,
+                        detail=response_data.get("detail", "Cached error response")
+                    )
+
+            # Timeout waiting for first request to complete
+            raise HTTPException(status_code=503, detail="Request timeout: concurrent request did not complete in time")
 
         # Different integrity error (not idempotency)
         raise HTTPException(status_code=400, detail="Database integrity error")
+
 
     except HTTPException:
         db.rollback()
         raise
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=500, detail=f"Transfer failed: {str(e)}")
+        import traceback
+        error_detail = f"Transfer failed: {str(e)}\n{traceback.format_exc()}"
+        print(f"ERROR IN TRANSFER: {error_detail}")
+        raise HTTPException(status_code=500, detail=error_detail)
 
 
 @router.get("", response_model=List[TransferOut])

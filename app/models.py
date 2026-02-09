@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, DateTime, ForeignKey, Numeric, Enum, Index, Integer
+from sqlalchemy import Column, String, DateTime, ForeignKey, Numeric, Enum, Index, Integer, Boolean
 from sqlalchemy.orm import relationship
 from datetime import datetime
 from .database import Base
@@ -68,6 +68,10 @@ class User(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     # user, admin
     role = Column(Enum(RoleType), default=RoleType.USER)
+
+    # Soft delete fields
+    is_deleted = Column(Boolean, default=False, nullable=False, index=True)
+    deleted_at = Column(DateTime, nullable=True)
 
     accounts = relationship("Account", back_populates="owner")
 

@@ -244,7 +244,7 @@ class CardCreateResponse(BaseModel):
 
 class CardPaymentCreate(BaseModel):
     card_id: UUID
-    
+
     # enforce amount between 0 and 10,000
     amount: float = Field(
         gt=0,
@@ -261,3 +261,56 @@ class CardPaymentCreate(BaseModel):
         if round(v, 2) != v:
             raise ValueError('Amount must have at most 2 decimal places')
         return v
+
+
+class PasswordChange(BaseModel):
+    current_password: str
+    new_password: str = Field(
+        min_length=8,
+        max_length=100,
+        description="Password must be at least 8 characters"
+    )
+
+    @field_validator('new_password')
+    @classmethod
+    def validate_password_strength(cls, v):
+        if not re.search(r'[A-Z]', v):
+            raise ValueError('Password must contain at least one uppercase letter')
+        if not re.search(r'[a-z]', v):
+            raise ValueError('Password must contain at least one lowercase letter')
+        if not re.search(r'\d', v):
+            raise ValueError('Password must contain at least one digit')
+        return v
+
+    @field_validator('new_password')
+    @classmethod
+    def passwords_different(cls, v, info):
+        if 'current_password' in info.data and v == info.data['current_password']:
+            raise ValueError('New password must be different from current password')
+        return v
+
+
+class EmailChange(BaseModel):
+    new_email: EmailStr
+    password: str
+
+
+class AccountDelete(BaseModel):
+    password: str
+    confirm_deletion: bool = Field(
+        description="Must be true to confirm account deletion"
+    )
+
+    @field_validator('confirm_deletion')
+    @classmethod
+    def must_confirm(cls, v):
+        if not v:
+            raise ValueError('You must confirm account deletion')
+        return v
+
+
+class AccountDeleteResponse(BaseModel):
+    message: str
+    deleted_at: datetime
+    accounts_closed: int
+    cards_cancelled: int

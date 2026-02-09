@@ -171,3 +171,101 @@ def test_password_validation_success():
     user = UserCreate(email="test@example.com", password="ValidPass123")
     assert user.email == "test@example.com"
     assert user.password == "ValidPass123"
+
+
+# =================================================================
+# Password Change Schema Tests
+# =================================================================
+
+def test_password_change_validation_success():
+    """Test that valid password change passes validation."""
+    from app.schemas import PasswordChange
+    pwd_change = PasswordChange(
+        current_password="OldPass123",
+        new_password="NewPass456"
+    )
+    assert pwd_change.current_password == "OldPass123"
+    assert pwd_change.new_password == "NewPass456"
+
+
+def test_password_change_new_password_too_short():
+    """Test that new password must be at least 8 characters."""
+    from app.schemas import PasswordChange
+    with pytest.raises(ValidationError) as exc:
+        PasswordChange(current_password="OldPass123", new_password="Short1")
+    assert "at least 8 characters" in str(exc.value)
+
+
+def test_password_change_new_password_no_uppercase():
+    """Test that new password must contain uppercase."""
+    from app.schemas import PasswordChange
+    with pytest.raises(ValidationError) as exc:
+        PasswordChange(current_password="OldPass123", new_password="lowercase123")
+    assert "uppercase letter" in str(exc.value)
+
+
+def test_password_change_new_password_no_lowercase():
+    """Test that new password must contain lowercase."""
+    from app.schemas import PasswordChange
+    with pytest.raises(ValidationError) as exc:
+        PasswordChange(current_password="OldPass123", new_password="UPPERCASE123")
+    assert "lowercase letter" in str(exc.value)
+
+
+def test_password_change_new_password_no_digit():
+    """Test that new password must contain a digit."""
+    from app.schemas import PasswordChange
+    with pytest.raises(ValidationError) as exc:
+        PasswordChange(current_password="OldPass123", new_password="NoDigitsHere")
+    assert "digit" in str(exc.value)
+
+
+def test_password_change_same_as_current():
+    """Test that new password cannot be same as current password."""
+    from app.schemas import PasswordChange
+    with pytest.raises(ValidationError) as exc:
+        PasswordChange(current_password="SamePass123", new_password="SamePass123")
+    assert "must be different" in str(exc.value)
+
+
+# =================================================================
+# Email Change Schema Tests
+# =================================================================
+
+def test_email_change_validation_success():
+    """Test that valid email change passes validation."""
+    from app.schemas import EmailChange
+    email_change = EmailChange(
+        new_email="newemail@example.com",
+        password="CurrentPass123"
+    )
+    assert email_change.new_email == "newemail@example.com"
+    assert email_change.password == "CurrentPass123"
+
+
+def test_email_change_invalid_email():
+    """Test that invalid email format is rejected."""
+    from app.schemas import EmailChange
+    with pytest.raises(ValidationError) as exc:
+        EmailChange(new_email="notanemail", password="CurrentPass123")
+    assert "email" in str(exc.value).lower()
+
+
+# =================================================================
+# Account Delete Schema Tests
+# =================================================================
+
+def test_account_delete_validation_success():
+    """Test that valid account delete passes validation."""
+    from app.schemas import AccountDelete
+    delete_req = AccountDelete(password="CurrentPass123", confirm_deletion=True)
+    assert delete_req.password == "CurrentPass123"
+    assert delete_req.confirm_deletion is True
+
+
+def test_account_delete_confirmation_required():
+    """Test that account deletion requires confirmation."""
+    from app.schemas import AccountDelete
+    with pytest.raises(ValidationError) as exc:
+        AccountDelete(password="CurrentPass123", confirm_deletion=False)
+    assert "must confirm" in str(exc.value)
