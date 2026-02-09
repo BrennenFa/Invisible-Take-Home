@@ -282,8 +282,7 @@ Invisible/
 ├── tests/
 │   ├── unit_tests/          # Business logic tests
 │   └── integration_tests/   # API endpoint tests
-├── db/
-│   └── security.md          # Security documentation
+├── SECURITY.md              # Security documentation
 ├── AI_USAGE.md              # AI development report
 ├── ROADMAP.md               # Future considerations
 └── requirements.txt
