@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, DateTime, ForeignKey, Numeric, Enum, Index
+from sqlalchemy import Column, String, DateTime, ForeignKey, Numeric, Enum, Index, Integer
 from sqlalchemy.orm import relationship
 from datetime import datetime
 from .database import Base
@@ -161,3 +161,28 @@ class Card(Base):
 
     account = relationship("Account", back_populates="cards")
     transactions = relationship("Transaction", back_populates="card", foreign_keys="Transaction.card_id")
+
+
+class IdempotencyKey(Base):
+    __tablename__ = "idempotency_keys"
+    __table_args__ = (
+        Index('ix_idempotency_user_id', 'user_id'),
+        Index('ix_idempotency_created_at', 'created_at'),
+    )
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    idempotency_key = Column(String, unique=True, nullable=False, index=True)
+
+    # Request context
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    endpoint = Column(String, nullable=False)
+
+    # Stored response
+    response_code = Column(Integer, nullable=False)
+    response_body = Column(String, nullable=False)
+
+    # Reference to created resource (if successful)
+    transfer_id = Column(UUID(as_uuid=True), ForeignKey("transfers.id"), nullable=True)
+
+    # Metadata
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)

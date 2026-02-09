@@ -6,9 +6,10 @@ from sqlalchemy.exc import IntegrityError
 from decimal import Decimal
 from uuid import UUID
 import uuid
+import json
 
 from ..database import get_db
-from ..models import Account, User, Transaction, TransactionDirection, AccountStatus, Transfer, TransactionCategory
+from ..models import Account, User, Transaction, TransactionDirection, AccountStatus, Transfer, TransactionCategory, IdempotencyKey
 from ..schemas import TransferCreate, TransferOut
 from ..security import get_current_user
 from ..security import limiter
@@ -27,22 +28,41 @@ def create_transfer(
 ):
     """
     Create a transfer between two accounts.
+    Requires Idempotency-Key header for exactly-once semantics.
     """
 
-    # validate that amount is positive
-    if transfer.amount <= 0:
-        raise HTTPException(status_code=400, detail="Amount must be positive")
+    # Extract and validate idempotency key
+    idempotency_key = request.headers.get("Idempotency-Key")
+    if not idempotency_key:
+        raise HTTPException(status_code=400, detail="Idempotency-Key header is required")
 
-    # Validate source and destination are different
-    if transfer.source_account_id == transfer.destination_account_id:
-        raise HTTPException(
-            status_code=400,
-            detail="Source and destination accounts must be different"
-        )
-
-    # database transaction for atomicity
     try:
-        # Fetch source account with row lock (concurrency)
+        # Try to insert idempotency record
+        idempotency_record = IdempotencyKey(
+            idempotency_key=idempotency_key,
+            user_id=current_user.id,
+            endpoint="POST /transfers",
+            response_code=0,
+            response_body=""
+        )
+        db.add(idempotency_record)
+        # Force check for duplicate key (unallowed)
+        db.flush()
+    
+
+        # Successfully inserted - first request, execute transfer
+        # Validate amount
+        if transfer.amount <= 0:
+            raise HTTPException(status_code=400, detail="Amount must be positive")
+
+        # Validate source and destination are different
+        if transfer.source_account_id == transfer.destination_account_id:
+            raise HTTPException(
+                status_code=400,
+                detail="Source and destination accounts must be different"
+            )
+
+        # Fetch source account with row lock
         source_account = db.execute(select(Account).filter(
             Account.id == transfer.source_account_id
         ).with_for_update()).scalar_one_or_none()
@@ -79,8 +99,6 @@ def create_transfer(
                 detail="Destination account is not active"
             )
 
-
-
         # Check sufficient balance
         amount_decimal = Decimal(str(transfer.amount))
         if source_account.balance < amount_decimal:
@@ -103,8 +121,6 @@ def create_transfer(
             category=TransactionCategory.TRANSFER,
             transfer_id=transfer_id
         )
-
-        # add debit transaction to session
         db.add(debit_transaction)
         db.flush()
 
@@ -118,7 +134,6 @@ def create_transfer(
             category=TransactionCategory.TRANSFER,
             transfer_id=transfer_id
         )
-        # add credit transaction to session
         db.add(credit_transaction)
         db.flush()
 
@@ -138,11 +153,8 @@ def create_transfer(
         )
         db.add(db_transfer)
 
-        # Commit all changes
-        db.commit()
-        db.refresh(db_transfer)
-
-        return TransferOut(
+        # Create response
+        transfer_result = TransferOut(
             id=db_transfer.id,
             source_account_id=db_transfer.source_account_id,
             destination_account_id=db_transfer.destination_account_id,
@@ -153,18 +165,58 @@ def create_transfer(
             destination_transaction_id=db_transfer.destination_transaction_id
         )
 
+        # Store response in idempotency record
+        idempotency_record.response_code = 201
+        idempotency_record.response_body = transfer_result.model_dump_json()
+        idempotency_record.transfer_id = db_transfer.id
+
+        # Commit everything atomically
+        db.commit()
+        db.refresh(db_transfer)
+
+        return transfer_result
+
+    # duplicate idempotency key
+    except IntegrityError as e:
+        db.rollback()
+
+        # Check if this is idempotency key constraint violation
+        if "idempotency_key" in str(e).lower():
+            # Fetch cached response
+            cached = db.execute(
+                select(IdempotencyKey).filter(
+                    IdempotencyKey.idempotency_key == idempotency_key,
+                    IdempotencyKey.user_id == current_user.id
+                )
+            ).scalar_one_or_none()
+
+            if not cached:
+                raise HTTPException(status_code=500, detail="Idempotency key check failed")
+
+            # Original request failed - return same error
+            if cached.response_code != 201:
+                # Original request failed - return same error
+                response_data = json.loads(cached.response_body)
+                raise HTTPException(
+                    status_code=cached.response_code,
+                    detail=response_data.get("detail", "Cached error response")
+                )
+
+            # Original request succeeded - return message body
+            return TransferOut(**json.loads(cached.response_body))
+
+
+        # Different integrity error (not idempotency)
+        raise HTTPException(status_code=400, detail="Database integrity error")
+
     except HTTPException:
         db.rollback()
         raise
-    except IntegrityError as e:
-        db.rollback()
-        raise HTTPException(status_code=400, detail="Database integrity error")
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Transfer failed: {str(e)}")
-    
 
-    
+
 @router.get("", response_model=List[TransferOut])
 @limiter.limit("100/minute")
 def get_transfers(

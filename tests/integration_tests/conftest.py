@@ -75,7 +75,7 @@ def user_data():
     random_id = str(uuid.uuid4())[:8]
     return {
         "email": f"test_{random_id}@gmail.com",
-        "password": "password2"
+        "password": "Password2"
     }
 
 
