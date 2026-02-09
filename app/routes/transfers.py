@@ -10,8 +10,11 @@ import uuid
 import json
 import time
 import hashlib
+import logging
 
 from ..database import get_db
+
+logger = logging.getLogger(__name__)
 from ..models import Account, User, Transaction, TransactionDirection, AccountStatus, Transfer, TransactionCategory, IdempotencyKey
 from ..schemas import TransferCreate, TransferOut, TransferCreateByAccountNumber
 from ..security import get_current_user
@@ -242,7 +245,8 @@ def create_transfer(
         raise
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=500, detail=f"Transfer failed: {str(e)}")
+        logger.error(f"Transfer failed: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Transfer failed")
 
 
 @router.post("/account", response_model=TransferOut, status_code=201)
@@ -313,7 +317,8 @@ def create_transfer_by_account_number(
         raise
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=500, detail=f"Transfer failed: {str(e)}")
+        logger.error(f"Transfer failed: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Transfer failed")
 
 
 @router.get("", response_model=List[TransferOut])

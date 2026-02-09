@@ -6,8 +6,11 @@ from decimal import Decimal
 from typing import List, Optional
 from uuid import UUID
 import json
+import logging
 
 from ..database import get_db
+
+logger = logging.getLogger(__name__)
 from ..models import Account, User, Transaction, TransactionDirection, AccountStatus, TransactionCategory, Card, CardStatus, IdempotencyKey
 from ..schemas import DepositCreate, WithdrawalCreate, TransactionOut, CardPaymentCreate
 from ..security import get_current_user
@@ -118,7 +121,8 @@ def create_deposit(
         raise
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=500, detail=f"Deposit failed: {str(e)}")
+        logger.error(f"Deposit failed: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Deposit failed")
 
 
 @router.post("/withdrawal", response_model=TransactionOut, status_code=201)
@@ -228,7 +232,8 @@ def create_withdrawal(
         raise
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=500, detail=f"Withdrawal failed: {str(e)}")
+        logger.error(f"Withdrawal failed: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Withdrawal failed")
 
 
 
@@ -346,7 +351,8 @@ def create_card_payment(
         raise HTTPException(status_code=400, detail="Database integrity error")
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=500, detail=f"Card payment failed: {str(e)}")
+        logger.error(f"Card payment failed: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Card payment failed")
 
 
 @router.get("", response_model=List[TransactionOut])

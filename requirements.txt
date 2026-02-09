@@ -16,6 +16,4 @@ reportlab
 httpx
 requests
 uuid
-httpx
-reportlab
 cryptography

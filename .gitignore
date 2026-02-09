@@ -34,7 +34,6 @@ htmlcov/
 curl/
 db/*
 backup/
-AI_USAGE.md
 
 
 # Ignore SQLite temporary files
