@@ -61,7 +61,10 @@ def prepare_for_backup():
     """Checkpoint WAL before backup to ensure consistency."""
     conn = engine.raw_connection()
     cursor = conn.cursor()
+<<<<<<< HEAD
 
+=======
+>>>>>>> e6ecf58de01bb27f8dfd2d915429910e002d504c
     # RESTART mode: checkpoint everything and restart WAL
     cursor.execute("PRAGMA wal_checkpoint(RESTART)")
     cursor.close()
@@ -70,12 +73,22 @@ def prepare_for_backup():
 
 def backup_database():
     """Create a timestamped backup of the database."""
+<<<<<<< HEAD
+=======
+    import shutil
+    from datetime import datetime
+>>>>>>> e6ecf58de01bb27f8dfd2d915429910e002d504c
 
     # Checkpoint WAL first
     prepare_for_backup()
 
+<<<<<<< HEAD
     # Get backup directory
     backup_dir = os.getenv("BACKUP_DIR")
+=======
+    # Get backup directory from env or default to backup/
+    backup_dir = os.getenv("BACKUP_DIR", "backup")
+>>>>>>> e6ecf58de01bb27f8dfd2d915429910e002d504c
 
     # Get DB path from DB_URL
     db_path = DB_URL.replace("sqlite:///", "")
