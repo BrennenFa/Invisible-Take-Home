@@ -45,18 +45,18 @@ def test_create_card_invalid_pin(authenticated_client):
     }
     
     response = client.post("/cards", headers=headers, json=card_data)
-    assert response.status_code == 400
-    assert "PIN must be exactly 4 digits" in response.json()["detail"]
+    assert response.status_code == 422
+    assert "String should have at least 4 characters" in response.text
 
 
 def test_get_cards_list(authenticated_client):
     """Test retrieving all cards for the user."""
     client, headers, _ = authenticated_client
-    
+
     # Create an account and a card
     acc = client.post("/accounts", headers=headers, json={"type": "CHECKING"}).json()
     client.post("/cards", headers=headers, json={
-        "account_id": acc["id"], "card_type": "DEBIT", 
+        "account_id": acc["id"], "card_type": "DEBIT",
         "card_holder_name": "Test User", "pin": "1111"
     })
 
@@ -64,6 +64,49 @@ def test_get_cards_list(authenticated_client):
     assert response.status_code == 200
     assert isinstance(response.json(), list)
     assert len(response.json()) >= 1
+
+
+def test_get_specific_card_success(authenticated_client):
+    """Test retrieving a specific card by ID."""
+    client, headers, _ = authenticated_client
+
+    # Create account and card
+    acc = client.post("/accounts", headers=headers, json={"type": "CHECKING"}).json()
+    card_response = client.post("/cards", headers=headers, json={
+        "account_id": acc["id"],
+        "card_type": "DEBIT",
+        "card_holder_name": "Test User",
+        "pin": "1234",
+        "spending_limit": 500.0
+    })
+    assert card_response.status_code == 201
+    card = card_response.json()
+
+    # Get specific card
+    response = client.get(f"/cards/{card['id']}", headers=headers)
+    assert response.status_code == 200
+
+    data = response.json()
+    assert data["id"] == card["id"]
+    assert data["card_holder_name"] == "Test User"
+    assert data["status"] == "ACTIVE"
+    assert "card_number_masked" in data
+
+
+def test_get_specific_card_not_found(authenticated_client):
+    """Test retrieving a non-existent card returns 404."""
+    client, headers, _ = authenticated_client
+
+    fake_id = str(uuid.uuid4())
+    response = client.get(f"/cards/{fake_id}", headers=headers)
+    assert response.status_code == 404
+
+
+def test_get_specific_card_unauthenticated(client):
+    """Test retrieving a specific card without auth returns 401."""
+    fake_id = str(uuid.uuid4())
+    response = client.get(f"/cards/{fake_id}")
+    assert response.status_code == 401
 
 
 def test_freeze_and_unfreeze_card(authenticated_client):

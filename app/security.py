@@ -7,6 +7,8 @@ from dotenv import load_dotenv
 from uuid import UUID
 from slowapi import Limiter
 from slowapi.util import get_remote_address
+from cryptography.fernet import Fernet
+import secrets
 
 
 from .database import get_db
@@ -60,3 +62,25 @@ def get_current_admin_user(
         )
 
     return current_user
+
+
+def encrypt_account_number(plain_text: str) -> bytes:
+    """Encrypt account number using Fernet symmetric encryption."""
+    key = os.getenv("ACCOUNT_NUMBER_SECRET")
+    return Fernet(key).encrypt(plain_text.encode())
+
+
+def decrypt_account_number(encrypted: bytes) -> str:
+    """Decrypt account number from bytes."""
+    key = os.getenv("ACCOUNT_NUMBER_SECRET")
+    return Fernet(key).decrypt(encrypted).decode()
+
+
+def mask_account_number(number: str) -> str:
+    """Mask account number showing only last 4 digits."""
+    return f"******{number[-4:]}"
+
+
+def generate_account_number() -> str:
+    """Generate a random 10-digit account number."""
+    return ''.join(str(secrets.randbelow(10)) for _ in range(10))

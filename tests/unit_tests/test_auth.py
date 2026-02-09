@@ -269,3 +269,78 @@ def test_account_delete_confirmation_required():
     with pytest.raises(ValidationError) as exc:
         AccountDelete(password="CurrentPass123", confirm_deletion=False)
     assert "must confirm" in str(exc.value)
+
+
+# =================================================================
+# Additional UserCreate Validation Tests
+# =================================================================
+
+def test_user_create_email_valid_formats():
+    """Test various valid email formats."""
+    valid_emails = [
+        "user@example.com",
+        "user.name@example.com",
+        "user+tag@example.com",
+        "user@subdomain.example.com",
+    ]
+    for email in valid_emails:
+        user = UserCreate(email=email, password="ValidPass123")
+        assert user.email == email
+
+
+def test_user_create_password_minimum_length():
+    """Test that password with exactly 8 characters is accepted."""
+    user = UserCreate(email="test@example.com", password="Valid123")
+    assert len(user.password) == 8
+
+
+def test_user_create_password_maximum_length():
+    """Test that password up to 100 characters is accepted."""
+    long_password = "A" * 49 + "a" * 49 + "12"  # 100 chars with upper, lower, digit
+    user = UserCreate(email="test@example.com", password=long_password)
+    assert len(user.password) == 100
+
+
+def test_user_create_password_too_long():
+    """Test that password exceeding 100 characters is rejected."""
+    long_password = "A" * 50 + "a" * 50 + "123"  # 103 chars
+    with pytest.raises(ValidationError) as exc:
+        UserCreate(email="test@example.com", password=long_password)
+    assert "at most 100 characters" in str(exc.value)
+
+
+def test_user_create_invalid_email_formats():
+    """Test various invalid email formats."""
+    invalid_emails = [
+        "notanemail",
+        "@example.com",
+        "user@",
+        "user@.com",
+    ]
+    for email in invalid_emails:
+        with pytest.raises(ValidationError):
+            UserCreate(email=email, password="ValidPass123")
+
+
+# =================================================================
+# Additional Password Change Schema Tests
+# =================================================================
+
+def test_password_change_new_password_minimum_length():
+    """Test that new password with exactly 8 characters is accepted."""
+    from app.schemas import PasswordChange
+    pwd_change = PasswordChange(
+        current_password="OldPass123",
+        new_password="NewPass1"
+    )
+    assert len(pwd_change.new_password) == 8
+
+
+def test_password_change_complex_password():
+    """Test that complex password with special chars passes."""
+    from app.schemas import PasswordChange
+    pwd_change = PasswordChange(
+        current_password="OldPass123",
+        new_password="Complex1Pass!"
+    )
+    assert pwd_change.new_password == "Complex1Pass!"

@@ -280,3 +280,61 @@ def test_card_payment_all_fields():
     assert payment.amount == 75.50
     assert payment.description == "Grocery shopping"
     assert payment.merchant == "Whole Foods"
+
+
+# =================================================================
+# Additional Boundary Tests
+# =================================================================
+
+def test_deposit_minimum_valid_amount():
+    """Test that minimum valid deposit amount (0.01) is accepted."""
+    deposit = DepositCreate(account_id=uuid4(), amount=0.01)
+    assert deposit.amount == 0.01
+
+
+def test_deposit_maximum_valid_amount():
+    """Test that maximum valid deposit amount (100000) is accepted."""
+    deposit = DepositCreate(account_id=uuid4(), amount=100000.00)
+    assert deposit.amount == 100000.00
+
+
+def test_withdrawal_minimum_valid_amount():
+    """Test that minimum valid withdrawal amount (0.01) is accepted."""
+    withdrawal = WithdrawalCreate(account_id=uuid4(), amount=0.01)
+    assert withdrawal.amount == 0.01
+
+
+def test_withdrawal_maximum_valid_amount():
+    """Test that maximum valid withdrawal amount (50000) is accepted."""
+    withdrawal = WithdrawalCreate(account_id=uuid4(), amount=50000.00)
+    assert withdrawal.amount == 50000.00
+
+
+def test_card_payment_minimum_valid_amount():
+    """Test that minimum valid card payment amount (0.01) is accepted."""
+    payment = CardPaymentCreate(card_id=uuid4(), amount=0.01)
+    assert payment.amount == 0.01
+
+
+def test_card_payment_maximum_valid_amount():
+    """Test that maximum valid card payment amount (10000) is accepted."""
+    payment = CardPaymentCreate(card_id=uuid4(), amount=10000.00)
+    assert payment.amount == 10000.00
+
+
+def test_deposit_two_decimal_places():
+    """Test that deposit amounts with 2 decimal places are accepted."""
+    deposit = DepositCreate(account_id=uuid4(), amount=123.45)
+    assert deposit.amount == 123.45
+
+
+def test_withdrawal_one_decimal_place():
+    """Test that withdrawal amounts with 1 decimal place are accepted."""
+    withdrawal = WithdrawalCreate(account_id=uuid4(), amount=99.5)
+    assert withdrawal.amount == 99.5
+
+
+def test_card_payment_whole_number():
+    """Test that card payment with whole number amount is accepted."""
+    payment = CardPaymentCreate(card_id=uuid4(), amount=100)
+    assert payment.amount == 100

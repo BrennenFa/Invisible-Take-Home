@@ -56,6 +56,24 @@ class AccountOut(BaseModel):
     balance: float
     status: AccountStatus
     created_at: datetime
+    routing_number: str
+    account_number_masked: str
+
+    class Config:
+        from_attributes = True
+
+
+class AccountCreateResponse(BaseModel):
+    """Response when creating a new account - includes full account number for transfer setup."""
+    id: UUID
+    user_id: UUID
+    type: AccountType
+    balance: float
+    status: AccountStatus
+    created_at: datetime
+    routing_number: str
+    account_number_masked: str
+    account_number: str  # Full account number (only returned at creation)
 
     class Config:
         from_attributes = True
@@ -101,6 +119,39 @@ class TransferCreate(BaseModel):
     def validate_accounts_different(cls, v, info):
         if 'source_account_id' in info.data and v == info.data['source_account_id']:
             raise ValueError('Source and destination accounts must be different')
+        return v
+
+
+class TransferCreateByAccountNumber(BaseModel):
+    source_account_id: UUID
+    destination_account_number: str
+    destination_routing_number: str
+    amount: float = Field(
+        gt=0,
+        le=1000000,
+        description="Transfer amount must be positive and not exceed $1,000,000"
+    )
+    description: Optional[str] = Field(None, max_length=500)
+
+    @field_validator('amount')
+    @classmethod
+    def validate_decimal_places(cls, v):
+        if round(v, 2) != v:
+            raise ValueError('Amount must have at most 2 decimal places')
+        return v
+
+    @field_validator('destination_account_number')
+    @classmethod
+    def validate_account_number(cls, v):
+        if not v or len(v) < 8 or len(v) > 17:
+            raise ValueError('Invalid account number format')
+        return v
+
+    @field_validator('destination_routing_number')
+    @classmethod
+    def validate_routing_number(cls, v):
+        if not v or len(v) != 9 or not v.isdigit():
+            raise ValueError('Routing number must be 9 digits')
         return v
 
 

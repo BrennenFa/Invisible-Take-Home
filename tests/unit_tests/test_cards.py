@@ -271,3 +271,93 @@ def test_spending_limit_optional():
         card_type=CardType.DEBIT
     )
     assert card.spending_limit is None
+
+
+# =================================================================
+# Additional Boundary and Edge Case Tests
+# =================================================================
+
+def test_spending_limit_minimum_valid():
+    """Test that minimum valid spending limit (0.01) is accepted."""
+    card = CardCreate(
+        account_id=uuid4(),
+        card_holder_name="John Doe",
+        pin="1234",
+        card_type=CardType.DEBIT,
+        spending_limit=0.01
+    )
+    assert card.spending_limit == 0.01
+
+
+def test_spending_limit_maximum_valid():
+    """Test that maximum valid spending limit (50000) is accepted."""
+    card = CardCreate(
+        account_id=uuid4(),
+        card_holder_name="John Doe",
+        pin="1234",
+        card_type=CardType.DEBIT,
+        spending_limit=50000.00
+    )
+    assert card.spending_limit == 50000.00
+
+
+def test_card_holder_name_minimum_length():
+    """Test that card holder name with minimum length (2 chars) is accepted."""
+    card = CardCreate(
+        account_id=uuid4(),
+        card_holder_name="Jo",
+        pin="1234",
+        card_type=CardType.DEBIT
+    )
+    assert card.card_holder_name == "Jo"
+
+
+def test_card_holder_name_maximum_length():
+    """Test that card holder name with maximum length (50 chars) is accepted."""
+    name = "A" * 50
+    card = CardCreate(
+        account_id=uuid4(),
+        card_holder_name=name,
+        pin="1234",
+        card_type=CardType.DEBIT
+    )
+    assert len(card.card_holder_name) == 50
+
+
+def test_pin_all_zeros():
+    """Test that PIN with all zeros is valid."""
+    card = CardCreate(
+        account_id=uuid4(),
+        card_holder_name="John Doe",
+        pin="0000",
+        card_type=CardType.DEBIT
+    )
+    assert card.pin == "0000"
+
+
+def test_pin_all_nines():
+    """Test that PIN with all nines is valid."""
+    card = CardCreate(
+        account_id=uuid4(),
+        card_holder_name="John Doe",
+        pin="9999",
+        card_type=CardType.DEBIT
+    )
+    assert card.pin == "9999"
+
+
+def test_card_create_all_fields():
+    """Test card creation with all fields populated."""
+    account_id = uuid4()
+    card = CardCreate(
+        account_id=account_id,
+        card_holder_name="Dr. John Doe-Smith",
+        pin="5678",
+        card_type=CardType.CREDIT,
+        spending_limit=25000.50
+    )
+    assert card.account_id == account_id
+    assert card.card_holder_name == "Dr. John Doe-Smith"
+    assert card.pin == "5678"
+    assert card.card_type == CardType.CREDIT
+    assert card.spending_limit == 25000.50

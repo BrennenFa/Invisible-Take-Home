@@ -12,8 +12,9 @@ from .routes.cards import router as cards_router
 from .routes.statements import router as statements_router
 
 
-# create database tables ---- remove!!!!!
-# Base.metadata.create_all(bind=engine)
+# create database tables -- remove!!!
+
+Base.metadata.create_all(bind=engine)
 
 app = FastAPI(
     title="Banking REST API",

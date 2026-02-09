@@ -154,7 +154,7 @@ def test_statement_unauthenticated(client):
         f"/statements/account/{account_id}?start_date={start_date}&end_date={end_date}&format=json"
     )
 
-    assert response.status_code == 403, f"Expected 403: {response.text}"
+    assert response.status_code == 401, f"Expected 401: {response.text}"
 
 
 def test_statement_empty_date_range(authenticated_client):

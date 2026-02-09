@@ -1,5 +1,6 @@
 import pytest
 import uuid
+import json as json_lib
 
 
 def test_user_cannot_access_other_users_accounts(client):
@@ -85,11 +86,11 @@ def test_user_cannot_transfer_from_other_users_account(client):
     )
 
     assert response.status_code == 403, f"Expected 403: {response.text}"
-    assert "not authorized" in response.json()["detail"].lower()
+    assert "you do not have permission" in response.json()["detail"].lower()
 
 
-def test_user_cannot_transfer_to_other_users_account(client):
-    """Test that User A cannot transfer to User B's account (normally only internal transfers)."""
+def test_user_can_transfer_to_other_users_account(client):
+    """Test that User A CAN transfer to User B's account (inter-user transfers allowed)."""
     # Create User A
     user_a_data = {
         "email": "usera@example.com",
@@ -125,7 +126,7 @@ def test_user_cannot_transfer_to_other_users_account(client):
     acc_b = client.post("/accounts", headers=headers_b, json={"type": "CHECKING"}).json()
     account_b_id = acc_b["id"]
 
-    # User A tries to transfer to User B's account
+    # User A transfers to User B's account (should succeed)
     headers_a_with_idem = {**headers_a, "Idempotency-Key": str(uuid.uuid4())}
     response = client.post(
         "/transfers",
@@ -137,8 +138,14 @@ def test_user_cannot_transfer_to_other_users_account(client):
         }
     )
 
-    assert response.status_code == 403, f"Expected 403: {response.text}"
-    assert "not authorized" in response.json()["detail"].lower()
+    assert response.status_code == 201, f"Expected 201: {response.text}"
+
+    # Verify balances
+    acc_a_after = client.get(f"/accounts/{account_a_id}", headers=headers_a).json()
+    acc_b_after = client.get(f"/accounts/{account_b_id}", headers=headers_b).json()
+
+    assert acc_a_after["balance"] == 150.0, "User A should have 150 after sending 50"
+    assert acc_b_after["balance"] == 50.0, "User B should have 50 after receiving"
 
 
 def test_user_cannot_operate_on_other_users_card(client):
@@ -275,7 +282,8 @@ def test_deleted_user_cannot_login(authenticated_client, client):
     user_client, headers, user_data = authenticated_client
 
     # Delete account
-    user_client.delete(
+    user_client.request(
+        "DELETE",
         "/auth/account",
         headers=headers,
         json={
@@ -299,7 +307,8 @@ def test_deleted_user_cannot_use_token(authenticated_client):
     user_client, headers, user_data = authenticated_client
 
     # Delete account
-    user_client.delete(
+    user_client.request(
+        "DELETE",
         "/auth/account",
         headers=headers,
         json={

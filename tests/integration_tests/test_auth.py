@@ -291,3 +291,98 @@ def test_account_delete_unauthenticated(client):
         json={"password": "Password123", "confirm_deletion": True}
     )
     assert response.status_code == 401
+
+
+# ========== ADDITIONAL SIGNUP VALIDATION TESTS ==========
+
+def test_signup_password_no_uppercase(client):
+    """Test that password without uppercase letter is rejected."""
+    user_data = {
+        "email": f"test_{uuid.uuid4().hex[:8]}@example.com",
+        "password": "password1"
+    }
+    response = client.post("/auth/signup", json=user_data)
+    assert response.status_code == 422
+    assert "uppercase" in response.text.lower()
+
+
+def test_signup_password_no_lowercase(client):
+    """Test that password without lowercase letter is rejected."""
+    user_data = {
+        "email": f"test_{uuid.uuid4().hex[:8]}@example.com",
+        "password": "PASSWORD1"
+    }
+    response = client.post("/auth/signup", json=user_data)
+    assert response.status_code == 422
+    assert "lowercase" in response.text.lower()
+
+
+def test_signup_password_no_digit(client):
+    """Test that password without digit is rejected."""
+    user_data = {
+        "email": f"test_{uuid.uuid4().hex[:8]}@example.com",
+        "password": "PasswordNoDigit"
+    }
+    response = client.post("/auth/signup", json=user_data)
+    assert response.status_code == 422
+    assert "digit" in response.text.lower()
+
+
+def test_signup_password_too_short(client):
+    """Test that password shorter than 8 characters is rejected."""
+    user_data = {
+        "email": f"test_{uuid.uuid4().hex[:8]}@example.com",
+        "password": "Pass1"
+    }
+    response = client.post("/auth/signup", json=user_data)
+    assert response.status_code == 422
+
+
+def test_signup_invalid_email_format(client):
+    """Test that invalid email format is rejected."""
+    user_data = {
+        "email": "not-an-email",
+        "password": "ValidPass1"
+    }
+    response = client.post("/auth/signup", json=user_data)
+    assert response.status_code == 422
+
+
+def test_login_with_deleted_account(client):
+    """Test that logging into a deleted account fails."""
+    user_data = {
+        "email": f"deleted_{uuid.uuid4().hex[:8]}@example.com",
+        "password": "SecurePass1"
+    }
+
+    # Signup and get token
+    signup_res = client.post("/auth/signup", json=user_data)
+    token = signup_res.json()["access_token"]
+    headers = {"Authorization": f"Bearer {token}"}
+
+    # Delete account
+    client.request(
+        "DELETE",
+        "/auth/account",
+        headers=headers,
+        json={"password": user_data["password"], "confirm_deletion": True}
+    )
+
+    # Try to login
+    response = client.post("/auth/login", json=user_data)
+    assert response.status_code == 401
+
+
+def test_email_change_wrong_password(authenticated_client):
+    """Test email change fails with wrong password."""
+    client, headers, _ = authenticated_client
+
+    response = client.patch(
+        "/auth/email",
+        headers=headers,
+        json={
+            "new_email": f"new_{uuid.uuid4().hex[:8]}@example.com",
+            "password": "WrongPassword123"
+        }
+    )
+    assert response.status_code == 401

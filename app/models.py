@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, DateTime, ForeignKey, Numeric, Enum, Index, Integer, Boolean
+from sqlalchemy import Column, String, DateTime, ForeignKey, Numeric, Enum, Index, Integer, Boolean, LargeBinary
 from sqlalchemy.orm import relationship
 from datetime import datetime
 from .database import Base
@@ -81,6 +81,7 @@ class Account(Base):
     __table_args__ = (
         Index('ix_account_user_id', 'user_id'),
         Index('ix_account_created_at', 'created_at'),
+        Index('ix_account_number_encrypted', 'account_number_encrypted'),
     )
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
@@ -89,6 +90,10 @@ class Account(Base):
     balance = Column(Numeric(precision=10, scale=2), default=0.0, nullable=False)
     status = Column(Enum(AccountStatus), default=AccountStatus.ACTIVE, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    routing_number = Column(String(9), nullable=True, index=False)
+    account_number_encrypted = Column(LargeBinary, nullable=True, unique=True)
+    account_number_hash = Column(String(64), nullable=True, unique=True, index=True)  # SHA256 hash for lookups
+    account_number_masked = Column(String(12), nullable=True)
 
     owner = relationship("User", back_populates="accounts")
     transactions = relationship("Transaction", back_populates="account", cascade="all, delete-orphan")

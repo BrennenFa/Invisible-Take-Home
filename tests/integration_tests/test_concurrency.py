@@ -128,7 +128,6 @@ def test_concurrent_same_idempotency_key_one_wins(authenticated_client):
 
     # Both should succeed
     assert len(results) == 2
-    print(f"DEBUG - Same Idempotency Key Test: Results = {results}")  # Debug output
     assert all(r.get("status_code") == 201 for r in results), f"Expected 201 status codes, got: {[r.get('status_code') for r in results]}"
 
     # Both should return same transfer ID

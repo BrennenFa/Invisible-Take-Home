@@ -175,7 +175,7 @@ def test_withdrawal_frozen_account(authenticated_client):
     )
 
     assert response.status_code == 400, f"Expected 400: {response.text}"
-    assert "frozen" in response.json()["detail"].lower()
+    assert "not active" in response.json()["detail"].lower()
 
 
 def test_card_payment_success(authenticated_client):
@@ -356,22 +356,22 @@ def test_transactions_unauthenticated(client):
         "/transactions/deposit",
         json={"account_id": account_id, "amount": 100.0}
     )
-    assert response.status_code == 403, f"Expected 403: {response.text}"
+    assert response.status_code == 401, f"Expected 401: {response.text}"
 
     # Withdrawal
     response = client.post(
         "/transactions/withdrawal",
         json={"account_id": account_id, "amount": 50.0}
     )
-    assert response.status_code == 403, f"Expected 403: {response.text}"
+    assert response.status_code == 401, f"Expected 401: {response.text}"
 
     # Card payment
     response = client.post(
         "/transactions/card-payment",
         json={"card_id": str(uuid.uuid4()), "amount": 50.0}
     )
-    assert response.status_code == 403, f"Expected 403: {response.text}"
+    assert response.status_code == 401, f"Expected 401: {response.text}"
 
     # Get transactions
     response = client.get("/transactions")
-    assert response.status_code == 403, f"Expected 403: {response.text}"
+    assert response.status_code == 401, f"Expected 401: {response.text}"

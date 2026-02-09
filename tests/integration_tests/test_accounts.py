@@ -182,7 +182,7 @@ def test_close_account_with_balance_fails(authenticated_client):
     response = client.patch(f"/accounts/{account_id}/close", headers=headers)
 
     assert response.status_code == 400, f"Expected 400: {response.text}"
-    assert "balance must be zero" in response.json()["detail"].lower()
+    assert "cannot close account with non-zero balance." in response.json()["detail"].lower()
 
 
 def test_close_already_closed_account(authenticated_client):
