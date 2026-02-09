@@ -289,8 +289,29 @@ Invisible/
 └── requirements.txt
 ```
 
+## Test Client (Bonus)
+
+A Python test client is included that demonstrates the complete transfer workflow:
+
+```bash
+# Make sure the server is running first
+uvicorn app.main:app --reload
+
+# In another terminal, run the test client
+python test_client.py
+```
+
+The client demonstrates:
+1. User registration (two users)
+2. Account creation
+3. Depositing funds
+4. Transferring money between users via account number
+5. Checking balances
+6. Transaction history
+7. Statement generation
+
 ## Documentation
 
-- [Security Considerations](db/security.md)
+- [Security Considerations](SECURITY.md)
 - [Future Roadmap](ROADMAP.md)
 - [AI Usage Report](AI_USAGE.md)

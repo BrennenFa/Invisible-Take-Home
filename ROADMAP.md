@@ -20,7 +20,7 @@ This document outlines planned enhancements and future considerations for the Ba
 
 
 
-### 43 CORS Configuration
+### 3. CORS Configuration
 
 **Current State**: No frontend currently exists. As a result, I did not implement CORS, which would limit the web addresses that are able to access the API.
 
@@ -46,10 +46,17 @@ Referrer-Policy: strict-origin-when-cross-origin  # Control referrer info
 ```
 
 
-### 6. Two-Factor Authentication (2FA)
+### 5. Two-Factor Authentication (2FA)
 
 **Current State**: Only single-factor authentication (password) is implemented.
 
 **Proposed Change**: Adding 2FA would help improve the security and login system, ensuring only the people intended could access their account and account data.
 
+
+
+### 5. Frontend + Deployment
+
+**Current State**: There is currently no frontend and the system isn't deployed. Initially, I planned on implementing a frontend deployed on Vercel and deploying the Backend to Vercel. However, I ran out of time.
+
+**Proposed Change**: This would make the system appear more official.
 

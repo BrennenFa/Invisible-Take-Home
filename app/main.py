@@ -4,6 +4,11 @@ from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 from .database import Base, engine
 from .security import limiter
+
+# Create database tables on startup
+Base.metadata.create_all(bind=engine)
+
+
 from .routes.auth import router as auth_router
 from .routes.accounts import router as accounts_router
 from .routes.transfers import router as transfers_router
@@ -11,10 +16,6 @@ from .routes.transactions import router as transactions_router
 from .routes.cards import router as cards_router
 from .routes.statements import router as statements_router
 
-
-# create database tables -- remove!!!
-
-Base.metadata.create_all(bind=engine)
 
 app = FastAPI(
     title="Banking REST API",
